@@ -16,7 +16,7 @@
 - 🤖 **AI Desktop Agent** — Hermes lives natively in your OS. Press `Super+A` to chat, control themes, debug audio, update system
 - 🧠 **LLM-Powered Installer** — Self-heals when packages fail. Sends errors to LLM, gets fix commands, retries
 - 🪟 **Dual Compositor** — Full support for Hyprland (master/stack) and Niri (scrollable tiling)
-- 🚀 **Smart Install** — Interactive installer with 2-step method (explained below)
+- 🚀 **Smart Install** — Clones repo, bootstraps Python, runs LLM installer automatically
 
 ## 🎨 Themes
 
@@ -30,7 +30,7 @@
 Switch themes instantly:
 ```bash
 nous-theme pharaoh      # CLI
-Super+T                  # GUI menu
+Super+T                  # GUI menu (Wofi)
 ```
 
 ## 🤖 AI Agent (Hermes)
@@ -47,51 +47,102 @@ The agent uses LLM (OpenRouter) and can safely execute whitelisted system comman
 
 ## 📦 Installation
 
-### ⚠️ Important: Interactive Setup Required
+### Option 1: One-Liner (With AI Features)
 
-The installer needs to prompt you for an **OpenRouter API key** (for the AI self-healing feature). Because of this, the old `curl | bash` method **will not work** — pipes don't provide an interactive terminal.
-
-### ✅ Correct Installation (2-Step Method)
+Set your OpenRouter API key, then pipe the installer:
 
 ```bash
-# Step 1: Download the installer
+export OPENROUTER_API_KEY="sk-..."
+curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh | bash
+```
+
+**What happens:**
+1. Script detects pipe mode ✅
+2. Clones repo to `~/.nous-land` ✅
+3. Bootstraps Python venv ✅
+4. Runs LLM smart installer with your API key ✅
+
+---
+
+### Option 2: Two-Step (Interactive, Recommended)
+
+If you don't have your API key yet, or prefer interactive prompts:
+
+```bash
+# Step 1: Download
 curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh -o /tmp/nous-install.sh
 
-# Step 2: Run it interactively (gives you a real terminal for the API key prompt)
+# Step 2: Run interactively (prompts for API key)
 bash /tmp/nous-install.sh
 ```
 
-### 🚀 What Happens During Install
+**Benefits:**
+- Proper terminal for interactive `input()` prompts
+- Can skip API key (installs without AI features, add key later)
+- Better error visibility
 
-1. **Pre-flight checks** — Verifies Arch Linux, installs missing dependencies
-2. **Clones repository** to `~/.config/nous-land/`
-3. **Bootstraps Python** — Creates venv, installs dependencies
-4. **LLM Smart Install** — Installs all packages (Hyprland, Niri, Kitty, Waybar, etc.)
-   - If a package fails → LLM analyzes the error → suggests fix → retries automatically
-5. **Deploys configs** — Copies all dotfiles to `~/.config/`
-6. **Sets up AI Agent** — Hermes daemon + keybind integration
+---
 
-### Requirements
+### Option 3: No API Key (Basic Install)
+
+Just want the dotfiles without AI features?
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh | bash
+```
+
+The installer will:
+- ✅ Clone the repository
+- ✅ Install all packages (Hyprland, Niri, Kitty, Waybar, etc.)
+- ✅ Deploy configs
+- ⚠️ Skip AI features (add key later to `~/.nous-land/.env`)
+
+---
+
+### 🔧 What Happens During Install
+
+| Step | Action | Details |
+|------|--------|---------|
+| 1️⃣ | **Pre-flight checks** | Verifies Arch Linux, checks for `git` |
+| 2️⃣ | **Clone repository** | Clones to `~/.nous-land` (or pulls latest) |
+| 3️⃣ | **Bootstrap Python** | Creates venv, installs dependencies |
+| 4️⃣ | **LLM Smart Install** | Installs packages via `pacman`/`yay` |
+| 5️⃣ | **Auto-heal errors** | LLM analyzes failures, suggests fixes, retries |
+| 6️⃣ | **Deploy configs** | Copies dotfiles to `~/.config/` |
+| 7️⃣ | **Setup AI Agent** | Hermes daemon + keybind integration |
+
+---
+
+### 📋 Requirements
 
 - **Arch Linux** (tested on CachyOS)
 - **pacman** and **yay**/`paru` (AUR helper)
 - **Python 3.10+**
-- **OpenRouter API Key** (get one free at [openrouter.ai](https://openrouter.ai))
+- **OpenRouter API Key** (get one free at [openrouter.ai](https://openrouter.ai)) — *optional for basic install*
 
-### For LLM Self-Healing
+---
 
-You'll be prompted for your **OpenRouter API key** during installation. This enables the smart installer to:
-- Auto-fix PGP key errors
-- Resolve package conflicts
-- Handle missing dependencies
-- Retry failed installations
+### 🔑 Adding API Key Later
 
-*The key is saved to `~/.config/nous-land/.env` and never committed to Git.*
+If you installed without an API key:
+
+```bash
+# Edit the .env file
+nano ~/.nous-land/.env
+
+# Add your key:
+OPENROUTER_API_KEY=sk-...
+
+# Restart the agent daemon
+systemctl --user restart nous-agent
+```
+
+---
 
 ## 📂 Directory Structure
 
 ```
-~/.config/nous-land/
+~/.nous-land/
 ├── themes/          # Theme definitions (Pharaoh, Obsidian, Cyberpunk, Solace)
 │   ├── pharaoh/
 │   ├── obsidian/
@@ -107,10 +158,18 @@ You'll be prompted for your **OpenRouter API key** during installation. This ena
 │   ├── rofi/
 │   └── mako/
 ├── scripts/         # Theme switcher, hot-reload, backup
+│   ├── theme-switcher.sh
+│   ├── hot-reload.sh
+│   └── backup-current.sh
 ├── agent/           # AI desktop agent (daemon, UI, tools)
+│   ├── daemon.py
+│   ├── ui.py
+│   └── system_tools.py
 ├── systemd/         # Systemd user units
+│   └── nous-agent.service
 ├── smart_installer.py
-└── install.sh
+├── install.sh
+└── .env            # Your API keys (NOT committed to Git)
 ```
 
 ## ⌨️ Keybinds (Shared Philosophy)
@@ -148,7 +207,7 @@ You'll be prompted for your **OpenRouter API key** during installation. This ena
 
 ### Customizing Themes
 
-Edit any theme in `~/.config/nous-land/themes/<theme>/theme.json`:
+Edit any theme in `~/.nous-land/themes/<theme>/theme.json`:
 
 ```json
 {
@@ -163,7 +222,7 @@ Then apply: `nous-theme <theme>`
 
 ### Adding New Themes
 
-1. Create `~/.config/nous-land/themes/my-theme/theme.json`
+1. Create `~/.nous-land/themes/my-theme/theme.json`
 2. Follow the schema in `themes/_schema.json`
 3. Add `wallpaper.png` in the same directory
 4. Run `nous-theme my-theme`
