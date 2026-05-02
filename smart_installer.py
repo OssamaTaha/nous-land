@@ -15,7 +15,7 @@ from datetime import datetime
 from rich.prompt import Prompt, Confirm
 
 # ── Configuration ──────────────────────────────
-REPO_DIR = Path(__file__).parent
+REPO_DIR = Path(__file__).parent.resolve()
 LOG_FILE = REPO_DIR / "install.log"
 THEMES_DIR = REPO_DIR / "themes"
 CONFIGS_DIR = REPO_DIR / "configs"
