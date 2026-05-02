@@ -169,21 +169,41 @@ else
     warn "requirements.txt not found. Installed default dependencies."
 fi
 
-# ── Step 5: Execute Smart Installer ─────────────────
+# ── Step 5: Run Setup Wizard (TUI) ───────────────
+# Only run wizard in interactive mode (not piped)
+if [ -t 0 ] && [ -f "setup_wizard.py" ]; then
+    log "Launching Nous Land Setup Wizard..."
+    echo ""
+    $VENV_DIR/bin/python setup_wizard.py
+    WIZARD_EXIT=$?
+    echo ""
+
+    if [ $WIZARD_EXIT -ne 0 ]; then
+        err "Setup wizard cancelled or failed (exit code: $WIZARD_EXIT)"
+        err "Installation aborted."
+        exit 1
+    fi
+    ok "Setup wizard completed successfully."
+else
+    warn "Pipe mode or wizard not found — skipping TUI wizard"
+    warn "Set API key and model manually in .env file"
+fi
+
+# ── Step 6: Source Environment Variables ─────────
+# Load API key and model from .env (set by wizard)
+if [ -f "$NOUS_DIR/.env" ]; then
+    log "Loading environment variables from .env..."
+    # Export all variables from .env
+    set -a
+    source "$NOUS_DIR/.env"
+    set +a
+    ok "Environment loaded."
+fi
+
+# ── Step 7: Execute Smart Installer ─────────
 echo ""
 log "Starting LLM-powered smart installer..."
 echo ""
-
-# Check if API key is set (can be passed via environment)
-if [ -z "${OPENROUTER_API_KEY:-}" ] && [ "$PIPE_MODE" = true ]; then
-    warn "OPENROUTER_API_KEY is not set. AI features will be disabled."
-    warn "To enable AI self-healing, set the key before running:"
-    echo "  export OPENROUTER_API_KEY='your-key-here'"
-    echo "  curl -fsSL https://... | bash"
-    echo ""
-    info "Continuing installation without AI features..."
-    echo ""
-fi
 
 # Use the venv's python to ensure correct environment
 VENV_PYTHON="$VENV_DIR/bin/python"
