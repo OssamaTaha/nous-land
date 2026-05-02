@@ -2,9 +2,11 @@
 # ──────────────────────────────────────────────────────
 # NOUS LAND — Smart Installer Entry Point
 # Usage: curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh | bash
+# Better: curl -o /tmp/nous-install.sh https://... && bash /tmp/nous-install.sh
 # ──────────────────────────────────────────────────────
 
-set -euo pipefail
+# Note: we do NOT use 'set -u' because we check unbound vars with -n/-z
+set -eo pipefail
 
 # ── Colors ───────────────────────────────────────────
 RED='\033[0;31m'
@@ -22,11 +24,32 @@ info() { echo -e "${BOLD}[info]${NC} $*"; }
 
 # ── Banner ────────────────────────────────────────────
 echo ""
-echo -e "${BOLD}╔══════════════════════════════════════════╗${NC}"
+echo -e "${BOLD}╔════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║    NOUS LAND — Smart Dotfiles Installer  ║${NC}"
 echo -e "${BOLD}║    Hyprland + Niri + AI Agent           ║${NC}"
-echo -e "${BOLD}╚══════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}╚════════════════════════════════════════╝${NC}"
 echo ""
+
+# ── PIPE DETECTION (MUST be first thing after banner) ──
+# Check if stdin is a pipe/redirect (curl | bash scenario)
+if [ ! -t 0 ]; then
+    echo ""
+    echo -e "${BOLD}╔════════════════════════════════════════╗${NC}"
+    echo -e "${BOLD}║   INTERACTIVE SETUP REQUIRED            ║${NC}"
+    echo -e "${BOLD}╚════════════════════════════════════════╝${NC}"
+    echo ""
+    err "Running via 'curl | bash' does NOT support interactive prompts."
+    echo ""
+    info "The installer needs to ask you for an API key (for the AI features)."
+    info "Please run these TWO commands instead:"
+    echo ""
+    echo -e "  ${CYN}curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh -o /tmp/nous-install.sh${NC}"
+    echo -e "  ${CYN}bash /tmp/nous-install.sh${NC}"
+    echo ""
+    info "This gives the script a real terminal for interactive prompts."
+    echo ""
+    exit 1
+fi
 
 # ── Pre-flight Checks ─────────────────────────────────
 info "Running pre-flight checks..."
@@ -67,15 +90,16 @@ if [ -d "$NOUS_DIR/.git" ]; then
     git -C "$NOUS_DIR" pull --rebase 2>/dev/null || true
 else
     log "Cloning Nous Land repository..."
-    git clone "$REPO_URL" "$NOUS_DIR" 2>/dev/null || {
-        # If GitHub clone fails, create local structure
-        warn "GitHub clone failed. Creating local structure..."
-        mkdir -p "$NOUS_DIR"
-    }
+    if git clone "$REPO_URL" "$NOUS_DIR" 2>/dev/null; then
+        ok "Repository cloned successfully."
+    else
+        err "GitHub clone failed. Check your internet connection."
+        exit 1
+    fi
 fi
 
 # Ensure we're in the right directory
-cd "$NOUS_DIR" 2>/dev/null || {
+cd "$NOUS_DIR" || {
     err "Failed to enter $NOUS_DIR"
     exit 1
 }
@@ -106,6 +130,7 @@ if [ ! -d "$VENV_DIR" ]; then
 fi
 
 # Activate venv
+# shellcheck source=/dev/null
 source "$VENV_DIR/bin/activate"
 
 # Install Python dependencies
@@ -117,67 +142,31 @@ else
     # Install defaults if requirements.txt missing
     pip install -q requests textual
 fi
+
 # ── Hand Off to Smart Installer ─────────────────────
 log "Starting LLM-powered smart installer..."
 echo ""
 
-# Guard: if NOUS_INSTALLING=1, we're already in the interactive re-execution
-if [ "$NOUS_INSTALLING" = "1" ]; then
-    # We're in the re-executed script with proper stdin
-    if [ -f "smart_installer.py" ]; then
-        python3 smart_installer.py "$@"
-        EXIT_CODE=$?
-    else
-        warn "smart_installer.py not found. Skipping LLM installer."
-        warn "Deploying configs manually..."
-        CONFIGS_DIR="$NOUS_DIR/configs"
-        for dir in hyprland niri kitty waybar wofi swaync rofi mako; do
-            if [ -d "$CONFIGS_DIR/$dir" ]; then
-                cp -r "$CONFIGS_DIR/$dir" "$HOME/.config/"
-                log "Deployed $dir config"
-            fi
-        done
-        EXIT_CODE=0
-    fi
-elif [ -t 0 ]; then
-    # Running interactively - OK
-    if [ -f "smart_installer.py" ]; then
-        python3 smart_installer.py "$@"
-        EXIT_CODE=$?
-    else
-        warn "smart_installer.py not found. Skipping LLM installer."
-        # Basic fallback: just copy configs
-        CONFIGS_DIR="$NOUS_DIR/configs"
-        for dir in hyprland niri kitty waybar wofi swaync rofi mako; do
-            if [ -d "$CONFIGS_DIR/$dir" ]; then
-                cp -r "$CONFIGS_DIR/$dir" "$HOME/.config/"
-                log "Deployed $dir config"
-            fi
-        done
-        EXIT_CODE=0
-    fi
+if [ -f "smart_installer.py" ]; then
+    python3 smart_installer.py "$@"
+    EXIT_CODE=$?
 else
-    # Piped mode (curl | bash) - can't do interactive prompts
-    # Best approach: tell user to download + run manually
-    echo ""
-    echo -e "${BOLD}╔══════════════════════════════════╗${NC}"
-    echo -e "${BOLD}║  PIPED MODE DETECTED              ║${NC}"
-    echo -e "${BOLD}╚══════════════════════════════════╝${NC}"
-    echo ""
-    err "Running via 'curl | bash' does NOT support interactive prompts."
-    info "Please run these TWO commands instead:"
-    echo ""
-    echo -e "  ${CYN}curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh -o /tmp/nous-install.sh${NC}"
-    echo -e "  ${CYN}bash /tmp/nous-install.sh${NC}"
-    echo ""
-    info "This gives the script a real terminal for the API key prompt."
-    echo ""
-    exit 1
+    warn "smart_installer.py not found. Skipping LLM installer."
+    warn "Deploying configs manually..."
+    CONFIGS_DIR="$NOUS_DIR/configs"
+    for dir in hyprland niri kitty waybar wofi swaync rofi mako; do
+        if [ -d "$CONFIGS_DIR/$dir" ]; then
+            cp -r "$CONFIGS_DIR/$dir" "$HOME/.config/" 2>/dev/null || true
+            log "Deployed $dir config"
+        fi
+    done
+    EXIT_CODE=0
 fi
 
 # ── Post-Installation ────────────────────────────────
 echo ""
-if [ $EXIT_CODE -eq 0 ]; then
+
+if [ "$EXIT_CODE" -eq 0 ]; then
     ok "Installation complete!"
     echo ""
     info "Next steps:"
@@ -194,5 +183,5 @@ else
 fi
 
 # Cleanup
-rm -rf /tmp/nous-install-*
+rm -rf /tmp/nous-install.sh 2>/dev/null || true
 exit $EXIT_CODE
