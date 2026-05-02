@@ -35,7 +35,7 @@ if env_file.exists():
 LLM_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 LLM_API_BASE = os.environ.get("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
 # Default to a free-tier model available on OpenRouter
-LLM_MODEL = os.environ.get("NOUS_INSTALLER_MODEL", "google/gemini-flash-1.5:free")
+LLM_MODEL = os.environ.get("NOUS_INSTALLER_MODEL", "openrouter/free")
 
 # ── Logging ──────────────────────────────────────
 logging.basicConfig(

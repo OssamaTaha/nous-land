@@ -136,6 +136,7 @@ class ModelSelectScreen(Screen):
             with RadioSet(id="model-radio"):
                 # Default free models as fallback
                 defaults = [
+                    ("openrouter/free", "OpenRouter Free (Auto)"),
                     ("google/gemini-flash-1.5:free", "Google Gemini Flash 1.5 (Free)"),
                     ("meta-llama/llama-3.1-8b-instruct:free", "Meta Llama 3.1 8B (Free)"),
                     ("microsoft/phi-3-medium-128k-instruct:free", "Microsoft Phi-3 Medium (Free)"),
@@ -185,9 +186,9 @@ class ModelSelectScreen(Screen):
         elif selected:
             # Extract model ID from button id (remove "model-" prefix)
             btn_id = selected.id
-            self.app.model = btn_id[6:] if btn_id and btn_id.startswith("model-") else (btn_id or "google/gemini-flash-1.5:free")
+            self.app.model = btn_id[6:] if btn_id and btn_id.startswith("model-") else (btn_id or "openrouter/free")
         else:
-            self.app.model = "google/gemini-flash-1.5:free"  # Default
+            self.app.model = "openrouter/free"  # Default
 
         self.app.notify(f"Selected model: {self.app.model}", title="Model")
         self.app.push_screen(SaveScreen())
@@ -396,7 +397,7 @@ class SetupWizard(App):
     def __init__(self):
         super().__init__()
         self.api_key = ""
-        self.model = "google/gemini-flash-1.5:free"
+        self.model = "openrouter/free"
 
     def on_mount(self):
         self.push_screen(APIKeyScreen())
