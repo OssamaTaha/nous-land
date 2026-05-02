@@ -16,7 +16,7 @@
 - 🤖 **AI Desktop Agent** — Hermes lives natively in your OS. Press `Super+A` to chat, control themes, debug audio, update system
 - 🧠 **LLM-Powered Installer** — Self-heals when packages fail. Sends errors to LLM, gets fix commands, retries
 - 🪟 **Dual Compositor** — Full support for Hyprland (master/stack) and Niri (scrollable tiling)
-- 🚀 **One-Liner Install** — `curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh | bash`
+- 🚀 **Smart Install** — Interactive installer with 2-step method (explained below)
 
 ## 🎨 Themes
 
@@ -24,7 +24,7 @@
 |-------|-------------|--------|
 | **Pharaoh** | Ancient Egyptian / CRT retro | 🟡 Gold |
 | **Obsidian** | Dark minimal / Nous Research vibe | 🔵 Cool Blue |
-| **Cyberpunk** | Neon / synthwave | 💜 Hot Pink |
+| **Cyberpunk** | Neon / synthwave | 🟣 Hot Pink |
 | **Solace** | Warm / muted / productivity | 🟠 Amber |
 
 Switch themes instantly:
@@ -47,36 +47,76 @@ The agent uses LLM (OpenRouter) and can safely execute whitelisted system comman
 
 ## 📦 Installation
 
-### Quick Install (One-Liner)
+### ⚠️ Important: Interactive Setup Required
+
+The installer needs to prompt you for an **OpenRouter API key** (for the AI self-healing feature). Because of this, the old `curl | bash` method **will not work** — pipes don't provide an interactive terminal.
+
+### ✅ Correct Installation (2-Step Method)
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh | bash
+# Step 1: Download the installer
+curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh -o /tmp/nous-install.sh
+
+# Step 2: Run it interactively (gives you a real terminal for the API key prompt)
+bash /tmp/nous-install.sh
 ```
+
+### 🚀 What Happens During Install
+
+1. **Pre-flight checks** — Verifies Arch Linux, installs missing dependencies
+2. **Clones repository** to `~/.config/nous-land/`
+3. **Bootstraps Python** — Creates venv, installs dependencies
+4. **LLM Smart Install** — Installs all packages (Hyprland, Niri, Kitty, Waybar, etc.)
+   - If a package fails → LLM analyzes the error → suggests fix → retries automatically
+5. **Deploys configs** — Copies all dotfiles to `~/.config/`
+6. **Sets up AI Agent** — Hermes daemon + keybind integration
 
 ### Requirements
-- Arch Linux (tested on CachyOS)
-- `pacman` and `yay`/`paru` (AUR helper)
-- Python 3.10+
 
-### For LLM Self-Healing (Optional)
-```bash
-export OPENROUTER_API_KEY="your-key-here"
-curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh | bash
-```
+- **Arch Linux** (tested on CachyOS)
+- **pacman** and **yay**/`paru` (AUR helper)
+- **Python 3.10+**
+- **OpenRouter API Key** (get one free at [openrouter.ai](https://openrouter.ai))
+
+### For LLM Self-Healing
+
+You'll be prompted for your **OpenRouter API key** during installation. This enables the smart installer to:
+- Auto-fix PGP key errors
+- Resolve package conflicts
+- Handle missing dependencies
+- Retry failed installations
+
+*The key is saved to `~/.config/nous-land/.env` and never committed to Git.*
 
 ## 📂 Directory Structure
 
 ```
 ~/.config/nous-land/
 ├── themes/          # Theme definitions (Pharaoh, Obsidian, Cyberpunk, Solace)
+│   ├── pharaoh/
+│   ├── obsidian/
+│   ├── cyberpunk/
+│   └── solace/
 ├── configs/         # All config files (Hyprland, Niri, Kitty, Waybar, etc.)
+│   ├── hyprland/
+│   ├── niri/
+│   ├── kitty/
+│   ├── waybar/
+│   ├── wofi/
+│   ├── swaync/
+│   ├── rofi/
+│   └── mako/
 ├── scripts/         # Theme switcher, hot-reload, backup
 ├── agent/           # AI desktop agent (daemon, UI, tools)
-└── systemd/         # Systemd user units
+├── systemd/         # Systemd user units
+├── smart_installer.py
+└── install.sh
 ```
 
 ## ⌨️ Keybinds (Shared Philosophy)
 
 ### Global
+
 | Keybind | Action |
 |---------|--------|
 | `Super+Q` | Open Kitty terminal |
@@ -88,12 +128,14 @@ curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.s
 | `Super+F` | Toggle fullscreen |
 
 ### Workspaces
+
 | Keybind | Action |
 |---------|--------|
 | `Super+1-0` | Switch to workspace 1-10 |
 | `Super+Shift+1-0` | Move window to workspace 1-10 |
 
 ### Layout
+
 | Keybind | Action |
 |---------|--------|
 | `Super+Arrows` | Move focus |
@@ -105,7 +147,9 @@ curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.s
 ## 🛠️ Configuration
 
 ### Customizing Themes
+
 Edit any theme in `~/.config/nous-land/themes/<theme>/theme.json`:
+
 ```json
 {
   "colors": {
@@ -118,9 +162,10 @@ Edit any theme in `~/.config/nous-land/themes/<theme>/theme.json`:
 Then apply: `nous-theme <theme>`
 
 ### Adding New Themes
+
 1. Create `~/.config/nous-land/themes/my-theme/theme.json`
 2. Follow the schema in `themes/_schema.json`
-3. Add wallpaper.png in the same directory
+3. Add `wallpaper.png` in the same directory
 4. Run `nous-theme my-theme`
 
 ## 🤝 Contributing
