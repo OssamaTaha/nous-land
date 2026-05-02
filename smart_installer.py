@@ -34,7 +34,8 @@ if env_file.exists():
 # LLM Configuration (user can override via env vars)
 LLM_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 LLM_API_BASE = os.environ.get("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
-LLM_MODEL = os.environ.get("NOUS_INSTALLER_MODEL", "google/gemini-2.0-flash-lite")
+# Default to a free-tier model available on OpenRouter
+LLM_MODEL = os.environ.get("NOUS_INSTALLER_MODEL", "google/gemini-flash-1.5-8b-exp:free")
 
 # ── Logging ──────────────────────────────────────
 logging.basicConfig(
@@ -467,6 +468,63 @@ class SmartInstaller:
 
 
 # ── Main ─────────────────────────────────────────
+def select_model(api_key):
+    """Query OpenRouter for free models and let user select one."""
+    import requests
+
+    print("\n" + "="*50)
+    print("MODEL SELECTION — Choose your LLM")
+    print("="*50 + "\n")
+
+    # Try to fetch available free models from OpenRouter
+    models = []
+    try:
+        headers = {"Authorization": f"Bearer {api_key}"}
+        resp = requests.get("https://openrouter.ai/api/v1/models", headers=headers, timeout=10)
+        if resp.status_code == 200:
+            all_models = resp.json().get("data", [])
+            # Filter for free models (contain :free in ID)
+            free_models = [m for m in all_models if ":free" in m.get("id", "").lower()]
+            if free_models:
+                models = free_models[:15]  # Top 15
+                print("✓ Fetched free models from OpenRouter:\n")
+                for i, m in enumerate(models, 1):
+                    print(f"  {i}. {m['id']}")
+                print(f"  {len(models)+1}. Enter custom model name")
+                print()
+    except Exception as e:
+        print(f"Note: Could not fetch models from API ({e})")
+
+    # Fallback: known free models
+    if not models:
+        models = [
+            "google/gemini-flash-1.5:free",
+            "meta-llama/llama-3.1-8b-instruct:free",
+            "microsoft/phi-3-medium-128k-instruct:free",
+            "google/gemini-pro-1.5:free",
+            "nousresearch/hermes-3-llama-3.1-8b:free",
+        ]
+        print("Known free models on OpenRouter:\n")
+        for i, m in enumerate(models, 1):
+            print(f"  {i}. {m}")
+        print(f"  {len(models)+1}. Enter custom model name")
+        print()
+
+    try:
+        max_choice = len(models) + 1
+        choice = input(f"Select model (1-{max_choice}) [default: 1]: ").strip()
+        if not choice:
+            choice = "1"
+        idx = int(choice) - 1
+        if 0 <= idx < len(models):
+            return models[idx]
+        else:
+            custom = input("Enter custom model name: ").strip()
+            return custom if custom else models[0]
+    except (ValueError, EOFError):
+        return models[0]  # Default to first
+
+
 def main():
     # ── Interactive API Key Prompt ────────────────
     # Temporarily disable logging to stdout so input() prompt is visible
@@ -502,21 +560,48 @@ def main():
         except (EOFError, KeyboardInterrupt):
             print("\nSkipping LLM setup. Self-healing disabled.\n")
 
+    # Model selection (if API key is available and we're in interactive mode)
+    llm_model = os.environ.get("NOUS_INSTALLER_MODEL", "")
+    if llm_api_key and not llm_model:
+        # Check if we're in interactive mode
+        if sys.stdin.isatty():
+            try:
+                llm_model = select_model(llm_api_key)
+                if llm_model:
+                    # Save to .env
+                    env_file = REPO_DIR / ".env"
+                    with open(env_file, "a") as f:
+                        f.write(f"NOUS_INSTALLER_MODEL={llm_model}\n")
+                    os.environ["NOUS_INSTALLER_MODEL"] = llm_model
+                    print(f"✓ Model saved: {llm_model}\n")
+            except (EOFError, KeyboardInterrupt):
+                # Use default
+                llm_model = "google/gemini-flash-1.5:free"
+        else:
+            # Pipe mode — use default or skip
+            llm_model = "google/gemini-flash-1.5:free"
+            print(f"Pipe mode: using default model: {llm_model}")
+
     # Restore logging to stdout
     if stdout_handler:
         root_logger.addHandler(stdout_handler)
 
     installer = SmartInstaller()
-    
-    # Pass the key to the LLM client
+
+    # Pass the key and model to the LLM client
     if llm_api_key:
         installer.llm.api_key = llm_api_key
         installer.llm.available = True
 
-    log.info("="* 50)
+    if llm_model:
+        installer.llm.model = llm_model
+
+    log.info("="*50)
     log.info("NOUS LAND — Smart Installer Starting")
     log.info(f"LLM self-healing: {'ENABLED' if installer.llm.available else 'DISABLED (set OPENROUTER_API_KEY)'}")
-    log.info("="* 50)
+    if installer.llm.available:
+        log.info(f"Using model: {installer.llm.model}")
+    log.info("="*50)
     # Step 1: Backup
     log.info("\n── Step 1: Backing up existing configs ──")
     installer.backup_existing()
