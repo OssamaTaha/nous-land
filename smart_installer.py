@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-nous-land smart_installer.py
-An LLM-powered installer that self-heals when package installation fails.
+smart_installer.py — Nous Land LLM-Powered Smart Installer
+Installs packages with self-healing and interactive failure menu.
 """
 
 import subprocess
@@ -15,13 +15,15 @@ from datetime import datetime
 from rich.prompt import Prompt, Confirm
 
 # ── Configuration ──────────────────────────────
+# CRITICAL: Define REPO_DIR globally at the VERY TOP (after imports)
 REPO_DIR = Path(__file__).parent.resolve()
 LOG_FILE = REPO_DIR / "install.log"
 THEMES_DIR = REPO_DIR / "themes"
 CONFIGS_DIR = REPO_DIR / "configs"
 SCRIPTS_DIR = REPO_DIR / "scripts"
 BACKUP_DIR = Path.home() / ".config" / "nous-land-backup"
-# Load .env file if it exists (for saved API key)
+
+# Load .env file if it exists (for saved API key and model)
 env_file = REPO_DIR / ".env"
 if env_file.exists():
     with open(env_file) as f:
@@ -49,8 +51,8 @@ logging.basicConfig(
 )
 log = logging.getLogger("nous-installer")
 
-
-# ── Package Definitions ──────────────────────────
+# ── Package Definitions ──────────────────────────────
+# IMPORTANT: swww is NOT in pacman packages (it's AUR only!)
 PACMAN_PACKAGES = [
     "hyprland",
     "waybar",
@@ -90,14 +92,13 @@ AUR_PACKAGES = [
     "wlogout",
     "nwg-look",
     "bibata-cursor-theme",
-    "swww",
+    "swww",  # swww is AUR only!
 ]
 
 PIP_PACKAGES = [
     "requests>=2.31.0",
     "textual>=0.62.0",
 ]
-
 
 # ── LLM Client ───────────────────────────────────
 class LLMClient:
@@ -257,9 +258,12 @@ class SmartInstaller:
             self._install_single_pacman(pkg)
 
     def _install_single_pacman(self, pkg: str):
-        """Install a single pacman package with retry and LLM healing."""
-        for attempt in range(1, self.MAX_RETRIES + 1):
+        """Install a single pacman package with retry and interactive menu."""
+        attempt = 0
+        while attempt < self.MAX_RETRIES:
+            attempt += 1
             log.info(f"  Installing {pkg} (attempt {attempt}/{self.MAX_RETRIES})...")
+
             result = run_command(f"pacman -S --noconfirm --needed {pkg}", check=False, sudo=True)
 
             if result.returncode == 0:
@@ -271,6 +275,7 @@ class SmartInstaller:
             stderr = result.stderr.strip() if result.stderr else ""
             stdout = result.stdout.strip() if result.stdout else ""
 
+            # Try LLM fix if available
             if self.llm.available and attempt < self.MAX_RETRIES:
                 log.info(f"  Asking LLM for fix...")
                 fix_cmd = self.llm.ask(
@@ -364,8 +369,11 @@ class SmartInstaller:
 
     def _install_single_aur(self, pkg: str, helper: str = "yay"):
         """Install a single AUR package with retry and interactive menu."""
-        for attempt in range(1, self.MAX_RETRIES + 1):
-            log.info(f"  Installing {pkg} from AUR (attempt {attempt})...")
+        attempt = 0
+        while attempt < self.MAX_RETRIES:
+            attempt += 1
+            log.info(f"  Installing {pkg} from AUR (attempt {attempt}/{self.MAX_RETRIES})...")
+
             result = run_command(f"{helper} -S --noconfirm --needed {pkg}", check=False)
 
             if result.returncode == 0:
@@ -377,6 +385,7 @@ class SmartInstaller:
             stderr = result.stderr.strip() if result.stderr else ""
             stdout = result.stdout.strip() if result.stdout else ""
 
+            # Try LLM fix if available
             if self.llm.available and attempt < self.MAX_RETRIES:
                 fix_cmd = self.llm.ask(
                     prompt=f"AUR helper failed to install '{pkg}'.\n\nstderr:\n{stderr}\n\nstdout:\n{stdout}\n\nWhat command fixes this?",
@@ -424,47 +433,44 @@ class SmartInstaller:
             return
 
         for pkg in packages:
-            result = run_command(f"{venv_pip} install {pkg}", check=False)
-
-            if result.returncode == 0:
-                log.info(f"  ✓ pip package {pkg} installed.")
-                continue
-
-            log.error(f"  ✗ pip package {pkg} failed.")
-            stderr = result.stderr.strip() if result.stderr else ""
-            stdout = result.stdout.strip() if result.stdout else ""
-
-            action = self._handle_package_failure(pkg, stderr, stdout, "pip")
-
-            if action == "retry":
-                log.info(f"  Retrying {pkg}...")
+            while True:
                 result = run_command(f"{venv_pip} install {pkg}", check=False)
+
                 if result.returncode == 0:
                     log.info(f"  ✓ pip package {pkg} installed.")
-                else:
-                    self.failed_packages.append(pkg)
-            elif action == "llm":
-                if self.llm.available:
-                    log.info(f"  Asking LLM for fix...")
-                    fix_cmd = self.llm.ask(
-                        prompt=f"pip failed to install '{pkg}'.\n\nstderr:\n{stderr}\n\nstdout:\n{stdout}\n\nWhat command fixes this?",
-                        context="Python pip package installation."
-                    )
-                    if fix_cmd:
-                        log.info(f"  LLM suggests: {fix_cmd}")
-                        run_command(fix_cmd, check=False)
-                        # Try installing again
-                        result = run_command(f"{venv_pip} install {pkg}", check=False)
-                        if result.returncode == 0:
-                            log.info(f"  ✓ pip package {pkg} installed.")
-                        else:
-                            self.failed_packages.append(pkg)
-                else:
-                    log.warning(f"  Skipping {pkg} (LLM not available)")
-                    self.failed_packages.append(pkg)
-            elif action == "skip":
-                pass  # Already handled in _handle_package_failure()
-            # "abort" is handled in _handle_package_failure()
+                    break
+
+                log.error(f"  ✗ pip package {pkg} failed.")
+                stderr = result.stderr.strip() if result.stderr else ""
+                stdout = result.stdout.strip() if result.stdout else ""
+
+                action = self._handle_package_failure(pkg, stderr, stdout, "pip")
+
+                if action == "retry":
+                    log.info(f"  Retrying {pkg}...")
+                    continue  # Retry the while loop
+                elif action == "llm":
+                    if self.llm.available:
+                        log.info(f"  Asking LLM for fix...")
+                        fix_cmd = self.llm.ask(
+                            prompt=f"pip failed to install '{pkg}'.\n\nstderr:\n{stderr}\n\nstdout:\n{stdout}\n\nWhat command fixes this?",
+                            context="Python pip package installation."
+                        )
+                        if fix_cmd:
+                            log.info(f"  LLM suggests: {fix_cmd}")
+                            run_command(fix_cmd, check=False)
+                            # Try installing again
+                            result = run_command(f"{venv_pip} install {pkg}", check=False)
+                            if result.returncode == 0:
+                                log.info(f"  ✓ pip package {pkg} installed.")
+                                break
+                    else:
+                        log.warning(f"  Skipping {pkg} (LLM not available)")
+                        self.failed_packages.append(pkg)
+                        break
+                elif action == "skip":
+                    break  # Skip this package
+                # "abort" is handled in _handle_package_failure()
 
     def backup_existing(self):
         """Backup existing dotfiles before overwriting."""
@@ -519,172 +525,47 @@ class SmartInstaller:
             dest = Path.home() / dest_path
 
             if src.exists():
-                dest.mkdir(parents=True, exist_ok=True)
-                # Copy contents
-                for item in src.iterdir():
-                    if item.is_file():
-                        shutil.copy2(item, dest / item.name)
-                    elif item.is_dir():
-                        shutil.copytree(item, dest / item.name, dirs_exist_ok=True)
+                if dest.exists():
+                    shutil.rmtree(dest)
+                shutil.copytree(src, dest, dirs_exist_ok=True)
                 log.info(f"  Deployed {src_name} → {dest}")
 
-        # Deploy scripts
-        bin_dir = Path.home() / ".local" / "bin"
-        bin_dir.mkdir(parents=True, exist_ok=True)
-        for script in SCRIPTS_DIR.iterdir():
-            if script.suffix == ".sh":
-                dest = bin_dir / script.stem
-                shutil.copy2(script, dest)
-                dest.chmod(0o755)
-                log.info(f"  Installed script: {script.stem}")
-
-        # Deploy agent
-        agent_dest = Path.home() / ".config" / "nous-agent"
-        agent_src = REPO_DIR / "agent"
-        if agent_src.exists():
-            shutil.copytree(agent_src, agent_dest, dirs_exist_ok=True)
-            # Make agent scripts executable
-            for f in agent_dest.iterdir():
-                if f.suffix == ".py":
-                    f.chmod(0o755)
-            log.info(f"  Deployed agent → {agent_dest}")
-
-        # Install systemd units
-        systemd_user = Path.home() / ".config" / "systemd" / "user"
-        systemd_src = REPO_DIR / "systemd"
-        if systemd_src.exists():
-            systemd_user.mkdir(parents=True, exist_ok=True)
-            for unit in systemd_src.iterdir():
-                shutil.copy2(unit, systemd_user / unit.name)
-            run_command("systemctl --user daemon-reload", check=False)
-            log.info("  Installed systemd user units.")
-
     def apply_default_theme(self):
-        """Apply the first available theme as default."""
-        # Find first available theme
-        default_theme = None
-        if THEMES_DIR.exists():
-            for d in sorted(THEMES_DIR.iterdir()):
-                if d.is_dir() and (d / "theme.json").exists():
-                    default_theme = d.name
-                    break
-
-        if not default_theme:
-            log.warning("No themes found.")
-            return
-
-        log.info(f"Applying default theme: {default_theme}")
-        switcher = SCRIPTS_DIR / "theme-switcher.sh"
-        if switcher.exists():
-            run_command(f"bash {switcher} {default_theme}", check=False)
+        """Apply the default theme (pharaoh)."""
+        log.info("Applying default theme: pharaoh...")
+        theme_script = SCRIPTS_DIR / "theme-switcher.sh"
+        if theme_script.exists():
+            run_command(f"bash {theme_script} pharaoh", check=False)
         else:
-            log.warning("theme-switcher.sh not found. Skipping theme application.")
+            log.warning("theme-switcher.sh not found, skipping theme application.")
 
     def print_summary(self):
         """Print installation summary."""
-        print("\n" + "=" * 50)
-        print("  NOUS LAND — Installation Summary")
-        print("=" * 50)
-        print(f"  Installed: {len(self.installed_packages)} packages")
-        if self.failed_packages:
-            print(f"  Failed:    {len(self.failed_packages)} packages")
-            for pkg in self.failed_packages:
-                print(f"    - {pkg}")
-        else:
-            print("  Failed:    None ✓")
-        print(f"  Log file:  {LOG_FILE}")
-        print("=" * 50)
-
-        if self.failed_packages:
-            print("\n  Some packages failed. You can:")
-            print("  1. Check the log: cat ~/.config/nous-land/install.log")
-            print("  2. Set OPENROUTER_API_KEY and re-run for LLM self-healing")
-            print("  3. Install failed packages manually")
-
-
-# ── Main ─────────────────────────────────────────
-def select_model(api_key):
-    """Query OpenRouter for free models and let user select one."""
-    import requests
-
-    print("\n" + "="*50)
-    print("MODEL SELECTION — Choose your LLM")
-    print("="*50 + "\n")
-
-    # Try to fetch available free models from OpenRouter
-    models = []
-    try:
-        headers = {"Authorization": f"Bearer {api_key}"}
-        resp = requests.get("https://openrouter.ai/api/v1/models", headers=headers, timeout=10)
-        if resp.status_code == 200:
-            all_models = resp.json().get("data", [])
-            # Filter for free models (contain :free in ID)
-            free_models = [m for m in all_models if ":free" in m.get("id", "").lower()]
-            if free_models:
-                models = free_models[:15]  # Top 15
-                print("✓ Fetched free models from OpenRouter:\n")
-                for i, m in enumerate(models, 1):
-                    print(f"  {i}. {m['id']}")
-                print(f"  {len(models)+1}. Enter custom model name")
-                print()
-    except Exception as e:
-        print(f"Note: Could not fetch models from API ({e})")
-
-    # Fallback: known free models
-    if not models:
-        models = [
-            "google/gemini-flash-1.5:free",
-            "meta-llama/llama-3.1-8b-instruct:free",
-            "microsoft/phi-3-medium-128k-instruct:free",
-            "google/gemini-pro-1.5:free",
-            "nousresearch/hermes-3-llama-3.1-8b:free",
-        ]
-        print("Known free models on OpenRouter:\n")
-        for i, m in enumerate(models, 1):
-            print(f"  {i}. {m}")
-        print(f"  {len(models)+1}. Enter custom model name")
         print()
-
-    try:
-        max_choice = len(models) + 1
-        choice = input(f"Select model (1-{max_choice}) [default: 1]: ").strip()
-        if not choice:
-            choice = "1"
-        idx = int(choice) - 1
-        if 0 <= idx < len(models):
-            model = models[idx]
-            # Handle both dict (from API) and string (from fallback)
-            if isinstance(model, dict):
-                return model["id"]
-            return model
-        else:
-            custom = input("Enter custom model name: ").strip()
-            return custom if custom else models[0]["id"] if isinstance(models[0], dict) else models[0]
-    except (ValueError, EOFError):
-        # Default to first model
-        if isinstance(models[0], dict):
-            return models[0]["id"]
-        return models[0]
+        print("=" * 60)
+        print("INSTALLATION SUMMARY")
+        print("=" * 60)
+        print(f"✓ Installed packages: {len(self.installed_packages)}")
+        for pkg in self.installed_packages:
+            print(f"  - {pkg}")
+        if self.failed_packages:
+            print(f"✗ Failed packages: {len(self.failed_packages)}")
+            for pkg in self.failed_packages:
+                print(f"  - {pkg}")
+        print("=" * 60)
 
 
+# ── Main ─────────────────────────────────────────────
 def main():
-    # ── Interactive API Key Prompt ────────────────
-    # Temporarily disable logging to stdout so input() prompt is visible
-    root_logger = logging.getLogger()
-    stdout_handler = None
-    for h in root_logger.handlers:
-        if isinstance(h, logging.StreamHandler) and h.stream == sys.stdout:
-            stdout_handler = h
-            root_logger.removeHandler(h)
-            break
+    """Entry point for the smart installer."""
 
     # Check API key (module-level or .env)
     llm_api_key = os.environ.get("OPENROUTER_API_KEY", "")
 
     if not llm_api_key:
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("  NOUS LAND — LLM Self-Healing Setup")
-        print("="*50)
+        print("=" * 50)
         print("\nNo OPENROUTER_API_KEY found. LLM self-healing is DISABLED.")
         print("To enable smart error recovery, enter your OpenRouter API key below.")
         print("Get one at: https://openrouter.ai/keys\n")
@@ -695,7 +576,7 @@ def main():
                 llm_api_key = user_key
                 # Save to .env for future runs
                 env_file = REPO_DIR / ".env"
-                with open(env_file, "w") as f:
+                with open(env_file, "a") as f:
                     f.write(f"OPENROUTER_API_KEY={user_key}\n")
                 os.environ["OPENROUTER_API_KEY"] = user_key
                 print("✓ API key saved to .env file.\n")
@@ -718,15 +599,11 @@ def main():
                     print(f"✓ Model saved: {llm_model}\n")
             except (EOFError, KeyboardInterrupt):
                 # Use default
-                llm_model = "google/gemini-flash-1.5:free"
+                llm_model = "openrouter/free"
         else:
             # Pipe mode — use default or skip
-            llm_model = "google/gemini-flash-1.5:free"
+            llm_model = "openrouter/free"
             print(f"Pipe mode: using default model: {llm_model}")
-
-    # Restore logging to stdout
-    if stdout_handler:
-        root_logger.addHandler(stdout_handler)
 
     installer = SmartInstaller()
 
@@ -738,12 +615,13 @@ def main():
     if llm_model:
         installer.llm.model = llm_model
 
-    log.info("="*50)
+    log.info("=" * 50)
     log.info("NOUS LAND — Smart Installer Starting")
     log.info(f"LLM self-healing: {'ENABLED' if installer.llm.available else 'DISABLED (set OPENROUTER_API_KEY)'}")
     if installer.llm.available:
         log.info(f"Using model: {installer.llm.model}")
-    log.info("="*50)
+    log.info("=" * 50)
+
     # Step 1: Backup
     log.info("\n── Step 1: Backing up existing configs ──")
     installer.backup_existing()
@@ -772,6 +650,67 @@ def main():
     installer.print_summary()
 
     sys.exit(0 if not installer.failed_packages else 1)
+
+
+def select_model(api_key):
+    """Query OpenRouter for free models and let user select one."""
+    import requests
+
+    print("\n" + "=" * 50)
+    print("MODEL SELECTION — Choose your LLM")
+    print("=" * 50 + "\n")
+
+    # Try to fetch available free models from OpenRouter
+    models = []
+    try:
+        headers = {"Authorization": f"Bearer {api_key}"}
+        resp = requests.get("https://openrouter.ai/api/v1/models", headers=headers, timeout=10)
+        if resp.status_code == 200:
+            all_models = resp.json().get("data", [])
+            # Filter for free models (contain :free in ID)
+            free_models = [m for m in all_models if ":free" in m.get("id", "").lower()]
+            if free_models:
+                models = free_models[:15]  # Top 15
+                print("✓ Fetched free models from OpenRouter:\n")
+                for i, m in enumerate(models, 1):
+                    print(f"  {i}. {m['id']}")
+                print(f"  {len(models)+1}. Enter custom model name")
+                print()
+    except Exception as e:
+        print(f"Note: Could not fetch models from API ({e})")
+
+    # Fallback: known free models
+    if not models:
+        models = [
+            "openrouter/free",
+            "google/gemini-flash-1.5:free",
+            "meta-llama/llama-3.1-8b-instruct:free",
+            "microsoft/phi-3-medium-128k-instruct:free",
+            "nousresearch/hermes-3-llama-3.1-8b:free",
+        ]
+        print("Known free models on OpenRouter:\n")
+        for i, m in enumerate(models, 1):
+            print(f"  {i}. {m}")
+        print(f"  {len(models)+1}. Enter custom model name")
+        print()
+
+    try:
+        max_choice = len(models) + 1
+        choice = input(f"Select model (1-{max_choice}) [default: 1]: ").strip()
+        if not choice:
+            choice = "1"
+        idx = int(choice) - 1
+        if 0 <= idx < len(models):
+            model = models[idx]
+            # Handle both dict (from API) and string (from fallback)
+            if isinstance(model, dict):
+                return model["id"]
+            return model
+        else:
+            custom = input("Enter custom model name: ").strip()
+            return custom if custom else models[0]
+    except (ValueError, EOFError):
+        return models[0]  # Default to first
 
 
 if __name__ == "__main__":

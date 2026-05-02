@@ -5,7 +5,7 @@ A Textual TUI for configuring API keys and LLM model selection.
 """
 
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal
+from textual.containers import Container, Vertical, Horizontal
 from textual.widgets import Header, Footer, Static, Input, Button, RadioSet, RadioButton
 from textual.screen import Screen
 from textual import on
@@ -16,7 +16,7 @@ from pathlib import Path
 import requests
 
 # ── Configuration ──────────────────────────────────
-REPO_DIR = Path(__file__).parent
+REPO_DIR = Path(__file__).parent.resolve()
 ENV_FILE = REPO_DIR / ".env"
 
 # Nous Research aesthetic colors
@@ -115,7 +115,8 @@ class APIKeyScreen(Screen):
 class ModelSelectScreen(Screen):
     """Step 2: Model selection from OpenRouter."""
 
-    models = reactive([])
+    model_list = reactive([])  # Store raw model strings
+    custom_model = reactive("")
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -133,17 +134,28 @@ class ModelSelectScreen(Screen):
 
             yield Static("Select an LLM model:", classes="label")
 
-            with RadioSet(id="model-radio"):
-                # Default free models as fallback
-                defaults = [
-                    ("openrouter/free", "OpenRouter Free (Auto)"),
-                    ("google/gemini-flash-1.5:free", "Google Gemini Flash 1.5 (Free)"),
-                    ("meta-llama/llama-3.1-8b-instruct:free", "Meta Llama 3.1 8B (Free)"),
-                    ("microsoft/phi-3-medium-128k-instruct:free", "Microsoft Phi-3 Medium (Free)"),
-                    ("nousresearch/hermes-3-llama-3.1-8b:free", "Nous Hermes 3 8B (Free)"),
+            # Store model strings in model_list
+            if not self.model_list:
+                self.model_list = [
+                    "openrouter/free",
+                    "google/gemini-flash-1.5:free",
+                    "meta-llama/llama-3.1-8b-instruct:free",
+                    "microsoft/phi-3-medium-128k-instruct:free",
+                    "nousresearch/hermes-3-llama-3.1-8b:free",
                 ]
-                for model_id, label in defaults:
-                    yield RadioButton(label, id=f"model-{model_id}")
+
+            with RadioSet(id="model-radio"):
+                # Use enumerate() for safe integer IDs, store model string in name attribute
+                for i, model_id in enumerate(self.model_list):
+                    # Create a display label (shorten if needed)
+                    display_label = model_id
+                    if len(display_label) > 50:
+                        display_label = model_id[:47] + "..."
+                    yield RadioButton(
+                        display_label,
+                        id=f"model-{i}",  # Safe integer ID (no slashes/colons)
+                        name=model_id,       # Raw model string stored here (no character restrictions)
+                    )
 
             yield Static("", classes="spacer")
             yield Static("Or enter a custom model ID:", classes="label")
@@ -164,14 +176,31 @@ class ModelSelectScreen(Screen):
             resp = requests.get("https://openrouter.ai/api/v1/models", headers=headers, timeout=10)
             if resp.status_code == 200:
                 all_models = resp.json().get("data", [])
-                free_models = [m for m in all_models if ":free" in m.get("id", "").lower()][:10]
+                free_models = [m["id"] for m in all_models if ":free" in m.get("id", "").lower()][:10]
                 if free_models:
+                    self.model_list = free_models
+                    # Rebuild radio buttons with new models
                     radio_set = self.query_one("#model-radio", RadioSet)
                     radio_set.remove_children()
-                    for m in free_models:
-                        radio_set.mount(RadioButton(m["id"], id=f"model-{m['id']}"))
+                    for i, model_id in enumerate(self.model_list):
+                        display_label = model_id
+                        if len(display_label) > 50:
+                            display_label = model_id[:47] + "..."
+                        radio_set.mount(RadioButton(
+                            display_label,
+                            id=f"model-{i}",
+                            name=model_id,
+                        ))
         except Exception:
             pass  # Use defaults
+
+    @on(RadioSet.Changed, "#model-radio")
+    def on_radio_set_changed(self, event: RadioSet.Changed):
+        """Retrieve selected model using event.pressed.name (the raw model string)."""
+        if event.pressed:
+            # event.pressed.name contains the raw model string (e.g., "openrouter/free")
+            self.app.model = event.pressed.name
+            self.app.notify(f"Selected model: {self.app.model}", title="Model")
 
     @on(Button.Pressed, "#continue-btn")
     def on_continue(self):
@@ -184,9 +213,8 @@ class ModelSelectScreen(Screen):
         if custom:
             self.app.model = custom
         elif selected:
-            # Extract model ID from button id (remove "model-" prefix)
-            btn_id = selected.id
-            self.app.model = btn_id[6:] if btn_id and btn_id.startswith("model-") else (btn_id or "openrouter/free")
+            # Get model string from the button's name attribute (set in compose)
+            self.app.model = selected.name or "openrouter/free"
         else:
             self.app.model = "openrouter/free"  # Default
 
@@ -215,7 +243,7 @@ class SaveScreen(Screen):
 
             # Show summary
             yield Static("Configuration Summary:", classes="label")
-            yield Static(f"  API Key: {'✓ Configured' if self.app.api_key else '✗ Not set (LLM disabled)'}", classes="summary")
+            yield Static(f"  API Key: {'✓ Configured' if self.app.api_key else '✗ Not set (LLM disabled)' }", classes="summary")
             yield Static(f"  Model: {self.app.model}", classes="summary")
 
             yield Static("", classes="spacer")
@@ -284,6 +312,7 @@ class SetupWizard(App):
     Screen {
         background: #0a0a0a;
         color: #ffffff;
+        align: center middle;
     }
 
     Header {
@@ -291,11 +320,13 @@ class SetupWizard(App):
         color: #d4a017;
         text-style: bold;
         padding: 1;
+        dock: top;
     }
 
     Footer {
         background: #1a1a1a;
         color: #888888;
+        dock: bottom;
     }
 
     .screen-container {
@@ -387,6 +418,14 @@ class SetupWizard(App):
         color: #ffffff;
         border: round #888888;
     }
+
+    #api-key-input {
+        margin-bottom: 2;
+    }
+
+    #custom-model-input {
+        margin-bottom: 2;
+    }
     """
 
     BINDINGS = [
@@ -397,7 +436,7 @@ class SetupWizard(App):
     def __init__(self):
         super().__init__()
         self.api_key = ""
-        self.model = "openrouter/free"
+        self.model = "openrouter/free"  # Default model
 
     def on_mount(self):
         self.push_screen(APIKeyScreen())
