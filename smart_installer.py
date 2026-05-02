@@ -517,12 +517,19 @@ def select_model(api_key):
             choice = "1"
         idx = int(choice) - 1
         if 0 <= idx < len(models):
-            return models[idx]
+            model = models[idx]
+            # Handle both dict (from API) and string (from fallback)
+            if isinstance(model, dict):
+                return model["id"]
+            return model
         else:
             custom = input("Enter custom model name: ").strip()
-            return custom if custom else models[0]
+            return custom if custom else models[0]["id"] if isinstance(models[0], dict) else models[0]
     except (ValueError, EOFError):
-        return models[0]  # Default to first
+        # Default to first model
+        if isinstance(models[0], dict):
+            return models[0]["id"]
+        return models[0]
 
 
 def main():
