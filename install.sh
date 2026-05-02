@@ -2,10 +2,9 @@
 # ──────────────────────────────────────────────────────
 # NOUS LAND — Smart Installer Bootstrapper
 # Usage: curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh | bash
-# Better: curl -o /tmp/nous-install.sh https://... && bash /tmp/nous-install.sh
 # ──────────────────────────────────────────────────────
 
-# Note: NO 'set -u' - we check vars with -z/-n to avoid unbound errors
+# NO 'set -u' - we check vars with -z/-n to avoid unbound errors
 set -eo pipefail
 
 # ── Colors ───────────────────────────────────────────
@@ -30,25 +29,12 @@ echo -e "${BOLD}║    Hyprland + Niri + AI Agent           ║${NC}"
 echo -e "${BOLD}╚════════════════════════════════════════╝${NC}"
 echo ""
 
-# ── PIPE DETECTION (FIRST THING) ───────────────────
-# If stdin is a pipe (curl | bash), we can't do interactive prompts
+# ── Detect pipe mode ──────────────────────────────────
+PIPE_MODE=false
 if [ ! -t 0 ]; then
-    echo ""
-    echo -e "${BOLD}╔════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}║   INTERACTIVE SETUP REQUIRED            ║${NC}"
-    echo -e "${BOLD}╚════════════════════════════════════════╝${NC}"
-    echo ""
-    err "Running via 'curl | bash' does NOT support interactive prompts."
-    echo ""
-    info "The installer needs to ask you for an API key (for AI features)."
-    info "Please run these TWO commands instead:"
-    echo ""
-    echo -e "  ${CYN}curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh -o /tmp/nous-install.sh${NC}"
-    echo -e "  ${CYN}bash /tmp/nous-install.sh${NC}"
-    echo ""
-    info "This gives the script a real terminal for interactive prompts."
-    echo ""
-    exit 1
+    PIPE_MODE=true
+    info "Running in pipe mode (curl | bash)"
+    info "Tip: You can set OPENROUTER_API_KEY before running to enable AI features"
 fi
 
 # ── Pre-flight Checks ─────────────────────────────────
@@ -69,9 +55,13 @@ fi
 
 if [ ! -f /etc/arch-release ]; then
     warn "This doesn't appear to be Arch Linux. Continue anyway? (y/N)"
-    read -r answer
-    if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
-        exit 1
+    if [ "$PIPE_MODE" = false ]; then
+        read -r answer
+        if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
+            exit 1
+        fi
+    else
+        warn "Pipe mode: skipping non-Arch confirmation"
     fi
 fi
 
@@ -175,7 +165,6 @@ if [ -f "requirements.txt" ]; then
     pip install -q -r requirements.txt
     ok "Dependencies installed from requirements.txt"
 else
-    # Install defaults if requirements.txt missing
     pip install -q requests textual
     warn "requirements.txt not found. Installed default dependencies."
 fi
@@ -184,6 +173,17 @@ fi
 echo ""
 log "Starting LLM-powered smart installer..."
 echo ""
+
+# Check if API key is set (can be passed via environment)
+if [ -z "${OPENROUTER_API_KEY:-}" ] && [ "$PIPE_MODE" = true ]; then
+    warn "OPENROUTER_API_KEY is not set. AI features will be disabled."
+    warn "To enable AI self-healing, set the key before running:"
+    echo "  export OPENROUTER_API_KEY='your-key-here'"
+    echo "  curl -fsSL https://... | bash"
+    echo ""
+    info "Continuing installation without AI features..."
+    echo ""
+fi
 
 # Use the venv's python to ensure correct environment
 VENV_PYTHON="$VENV_DIR/bin/python"
@@ -210,6 +210,11 @@ if [ "$EXIT_CODE" -eq 0 ]; then
     echo "  4. Press Super+A to chat with Hermes (AI agent)"
     echo "  5. Press Super+T to switch themes via GUI"
     echo ""
+    if [ -z "${OPENROUTER_API_KEY:-}" ]; then
+        echo -e "  ${YLW}Tip: To enable AI features, add your OpenRouter API key:${NC}"
+        echo "  echo 'OPENROUTER_API_KEY=your-key' >> ~/.nous-land/.env"
+        echo ""
+    fi
     ok "Welcome to Nous Land! 🚀"
 else
     err "Installation exited with code $EXIT_CODE"
