@@ -117,20 +117,35 @@ else
     # Install defaults if requirements.txt missing
     pip install -q requests textual
 fi
-
-# ── Hand Off to Smart Installer ────────────────────
+# ── Hand Off to Smart Installer ─────────────────────
 log "Starting LLM-powered smart installer..."
 echo ""
 
-# Check if stdin is a terminal (interactive mode)
-if [ -t 0 ]; then
-    # Running interactively - OK
+# Guard: if NOUS_INSTALLING=1, we're already in the interactive re-execution
+if [ "$NOUS_INSTALLING" = "1" ]; then
+    # We're in the re-executed script with proper stdin
     if [ -f "smart_installer.py" ]; then
         python3 smart_installer.py "$@"
         EXIT_CODE=$?
     else
         warn "smart_installer.py not found. Skipping LLM installer."
         warn "Deploying configs manually..."
+        CONFIGS_DIR="$NOUS_DIR/configs"
+        for dir in hyprland niri kitty waybar wofi swaync rofi mako; do
+            if [ -d "$CONFIGS_DIR/$dir" ]; then
+                cp -r "$CONFIGS_DIR/$dir" "$HOME/.config/"
+                log "Deployed $dir config"
+            fi
+        done
+        EXIT_CODE=0
+    fi
+elif [ -t 0 ]; then
+    # Running interactively - OK
+    if [ -f "smart_installer.py" ]; then
+        python3 smart_installer.py "$@"
+        EXIT_CODE=$?
+    else
+        warn "smart_installer.py not found. Skipping LLM installer."
         # Basic fallback: just copy configs
         CONFIGS_DIR="$NOUS_DIR/configs"
         for dir in hyprland niri kitty waybar wofi swaync rofi mako; do
@@ -142,14 +157,16 @@ if [ -t 0 ]; then
         EXIT_CODE=0
     fi
 else
-    # Piped mode (curl | bash) - re-execute interactively
-    warn "Piped mode detected. Re-executing interactively for API key prompt..."
-    TMP_SCRIPT=$(mktemp /tmp/nous-install-XXXXXX.sh)
+    # Piped mode (curl | bash) - spawn pseudo-terminal for interactive input
+    warn "Piped mode detected. Spawning interactive shell..."
+    TMP_DIR=$(mktemp -d /tmp/nous-install-XXXXXX)
     # Download the install script
-    curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh -o "$TMP_SCRIPT" 2>/dev/null
-    if [ -f "$TMP_SCRIPT" ]; then
-        chmod +x "$TMP_SCRIPT"
-        exec bash "$TMP_SCRIPT"
+    curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh -o "$TMP_DIR/install.sh" 2>/dev/null
+    if [ -f "$TMP_DIR/install.sh" ]; then
+        chmod +x "$TMP_DIR/install.sh"
+        # Use script -q -c "command" /dev/null
+        # -q = quiet, -c = command to run, /dev/null = discard typescript
+        exec script -q -c "bash -i $TMP_DIR/install.sh" /dev/null
     else
         err "Failed to download install script for interactive re-execution."
         EXIT_CODE=1
