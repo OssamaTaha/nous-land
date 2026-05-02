@@ -12,16 +12,17 @@ import shutil
 import logging
 from pathlib import Path
 from datetime import datetime
+from rich.prompt import Prompt, Confirm
 
-# ── Configuration ────────────────────────────────
-REPA_DIR = Path(__file__).parent
-LOG_FILE = REPA_DIR / "install.log"
-THEMES_DIR = REPA_DIR / "themes"
-CONFIGS_DIR = REPA_DIR / "configs"
-SCRIPTS_DIR = REPA_DIR / "scripts"
+# ── Configuration ──────────────────────────────
+REPO_DIR = Path(__file__).parent
+LOG_FILE = REPO_DIR / "install.log"
+THEMES_DIR = REPO_DIR / "themes"
+CONFIGS_DIR = REPO_DIR / "configs"
+SCRIPTS_DIR = REPO_DIR / "scripts"
 BACKUP_DIR = Path.home() / ".config" / "nous-land-backup"
 # Load .env file if it exists (for saved API key)
-env_file = REPA_DIR / ".env"
+env_file = REPO_DIR / ".env"
 if env_file.exists():
     with open(env_file) as f:
         for line in f:
@@ -81,7 +82,6 @@ PACMAN_PACKAGES = [
     "git",
     "curl",
     "jq",
-    "swww",
     "niri",
 ]
 
@@ -90,6 +90,7 @@ AUR_PACKAGES = [
     "wlogout",
     "nwg-look",
     "bibata-cursor-theme",
+    "swww",
 ]
 
 PIP_PACKAGES = [
@@ -194,6 +195,49 @@ class SmartInstaller:
         self.failed_packages = []
         self.installed_packages = []
 
+    def _handle_package_failure(self, pkg: str, stderr: str, stdout: str, pkg_type: str = "pacman") -> str:
+        """Present interactive menu when a package fails to install.
+        Returns: 'retry', 'llm', 'skip', or 'abort'
+        """
+        print()
+        print("=" * 60)
+        print(f"PACKAGE INSTALLATION FAILED: {pkg}")
+        print("=" * 60)
+        if stderr:
+            print(f"\nError output:\n{stderr[:500]}")
+        if stdout:
+            print(f"\nStandard output:\n{stdout[:500]}")
+        print()
+
+        print("What would you like to do?")
+        print("  1. Try Again       - Re-run the exact same installation command")
+        print("  2. Use LLM to Fix  - Ask OpenRouter AI to analyze and fix the error")
+        print("  3. Skip / Continue  - Ignore this package and move to the next")
+        print("  4. Abort Installation - Cleanly exit the installer")
+        print()
+
+        try:
+            choice = Prompt.ask(
+                "Enter your choice",
+                choices=["1", "2", "3", "4"],
+                default="2"
+            )
+
+            if choice == "1":
+                return "retry"
+            elif choice == "2":
+                return "llm"
+            elif choice == "3":
+                log.warning(f"Skipping {pkg}")
+                self.failed_packages.append(pkg)
+                return "skip"
+            else:  # "4"
+                print("\nInstallation aborted by user.")
+                sys.exit(1)
+        except (EOFError, KeyboardInterrupt):
+            print("\n\nInstallation aborted by user.")
+            sys.exit(1)
+
     def install_pacman(self, packages: list):
         """Install packages via pacman with self-healing."""
         log.info(f"Installing {len(packages)} pacman packages...")
@@ -231,7 +275,7 @@ class SmartInstaller:
                 log.info(f"  Asking LLM for fix...")
                 fix_cmd = self.llm.ask(
                     prompt=f"pacman failed to install '{pkg}'.\n\nstderr:\n{stderr}\n\nstdout:\n{stdout}\n\nWhat command fixes this?",
-                    context=f"Arch Linux CachyOS. Package: {pkg}. Attempt {attempt}.",
+                    context=f"Arch Linux CachyOS. Package: {pkg}. Attempt {attempt}."
                 )
                 if fix_cmd:
                     log.info(f"  LLM suggests: {fix_cmd}")
@@ -242,8 +286,35 @@ class SmartInstaller:
             else:
                 self._try_common_fixes(pkg, stderr)
 
-        self.failed_packages.append(pkg)
+        # All retries failed — present interactive menu
         log.error(f"  ✗ {pkg} could not be installed after {self.MAX_RETRIES} attempts.")
+        action = self._handle_package_failure(pkg, stderr, stdout, "pacman")
+
+        if action == "retry":
+            log.info(f"  Retrying {pkg} from scratch...")
+            return self._install_single_pacman(pkg)  # Recursive retry
+        elif action == "llm":
+            if self.llm.available:
+                log.info(f"  Asking LLM for fix...")
+                fix_cmd = self.llm.ask(
+                    prompt=f"pacman failed to install '{pkg}' after {self.MAX_RETRIES} attempts.\n\nstderr:\n{stderr}\n\nWhat command fixes this?",
+                    context=f"Arch Linux CachyOS. Package: {pkg}. Final attempt."
+                )
+                if fix_cmd:
+                    log.info(f"  LLM suggests: {fix_cmd}")
+                    run_command(fix_cmd, check=False, sudo=True)
+                    # Try installing again after LLM fix
+                    result = run_command(f"pacman -S --noconfirm --needed {pkg}", check=False, sudo=True)
+                    if result.returncode == 0:
+                        self.installed_packages.append(pkg)
+                        log.info(f"  ✓ {pkg} installed after LLM fix.")
+                        return
+            # If LLM not available or fix didn't work, skip
+            log.warning(f"  Skipping {pkg} (LLM fix failed or unavailable)")
+            self.failed_packages.append(pkg)
+        elif action == "skip":
+            pass  # Already handled in _handle_package_failure()
+        # "abort" is handled in _handle_package_failure()
 
     def _try_common_fixes(self, pkg: str, stderr: str):
         """Try common Arch Linux fixes without LLM."""
@@ -292,7 +363,7 @@ class SmartInstaller:
         run_command(f"cd {tmp} && makepkg -si --noconfirm", check=False)
 
     def _install_single_aur(self, pkg: str, helper: str = "yay"):
-        """Install a single AUR package."""
+        """Install a single AUR package with retry and interactive menu."""
         for attempt in range(1, self.MAX_RETRIES + 1):
             log.info(f"  Installing {pkg} from AUR (attempt {attempt})...")
             result = run_command(f"{helper} -S --noconfirm --needed {pkg}", check=False)
@@ -302,23 +373,51 @@ class SmartInstaller:
                 log.info(f"  ✓ {pkg} installed from AUR.")
                 return
 
-            stderr = result.stderr.strip() if result.stderr else ""
             log.warning(f"  ✗ AUR install failed for {pkg}")
+            stderr = result.stderr.strip() if result.stderr else ""
+            stdout = result.stdout.strip() if result.stdout else ""
 
             if self.llm.available and attempt < self.MAX_RETRIES:
                 fix_cmd = self.llm.ask(
-                    prompt=f"AUR helper failed to install '{pkg}'.\n\nstderr:\n{stderr}\n\nFix command:",
-                    context="Arch Linux CachyOS. AUR package installation.",
+                    prompt=f"AUR helper failed to install '{pkg}'.\n\nstderr:\n{stderr}\n\nstdout:\n{stdout}\n\nWhat command fixes this?",
+                    context="Arch Linux CachyOS. AUR package installation."
                 )
                 if fix_cmd:
                     log.info(f"  LLM suggests: {fix_cmd}")
                     run_command(fix_cmd, check=False)
 
-        self.failed_packages.append(pkg)
-        log.error(f"  ✗ {pkg} could not be installed from AUR.")
+        # All retries failed — present interactive menu
+        log.error(f"  ✗ {pkg} could not be installed from AUR after {self.MAX_RETRIES} attempts.")
+        action = self._handle_package_failure(pkg, stderr, stdout, "aur")
+
+        if action == "retry":
+            log.info(f"  Retrying {pkg} from scratch...")
+            return self._install_single_aur(pkg, helper)  # Recursive retry
+        elif action == "llm":
+            if self.llm.available:
+                log.info(f"  Asking LLM for fix...")
+                fix_cmd = self.llm.ask(
+                    prompt=f"AUR helper failed to install '{pkg}' after {self.MAX_RETRIES} attempts.\n\nstderr:\n{stderr}\n\nWhat command fixes this?",
+                    context="Arch Linux CachyOS. AUR package installation. Final attempt."
+                )
+                if fix_cmd:
+                    log.info(f"  LLM suggests: {fix_cmd}")
+                    run_command(fix_cmd, check=False)
+                    # Try installing again after LLM fix
+                    result = run_command(f"{helper} -S --noconfirm --needed {pkg}", check=False)
+                    if result.returncode == 0:
+                        self.installed_packages.append(pkg)
+                        log.info(f"  ✓ {pkg} installed after LLM fix.")
+                        return
+            # If LLM not available or fix didn't work, skip
+            log.warning(f"  Skipping {pkg} (LLM fix failed or unavailable)")
+            self.failed_packages.append(pkg)
+        elif action == "skip":
+            pass  # Already handled in _handle_package_failure()
+        # "abort" is handled in _handle_package_failure()
 
     def install_pip(self, packages: list):
-        """Install Python packages in the venv."""
+        """Install Python packages in the venv with interactive menu."""
         venv_pip = REPO_DIR / ".venv" / "bin" / "pip"
         if not venv_pip.exists():
             log.error("Virtual environment not found. Run install.sh first.")
@@ -326,10 +425,46 @@ class SmartInstaller:
 
         for pkg in packages:
             result = run_command(f"{venv_pip} install {pkg}", check=False)
+
             if result.returncode == 0:
                 log.info(f"  ✓ pip package {pkg} installed.")
-            else:
-                log.error(f"  ✗ pip package {pkg} failed.")
+                continue
+
+            log.error(f"  ✗ pip package {pkg} failed.")
+            stderr = result.stderr.strip() if result.stderr else ""
+            stdout = result.stdout.strip() if result.stdout else ""
+
+            action = self._handle_package_failure(pkg, stderr, stdout, "pip")
+
+            if action == "retry":
+                log.info(f"  Retrying {pkg}...")
+                result = run_command(f"{venv_pip} install {pkg}", check=False)
+                if result.returncode == 0:
+                    log.info(f"  ✓ pip package {pkg} installed.")
+                else:
+                    self.failed_packages.append(pkg)
+            elif action == "llm":
+                if self.llm.available:
+                    log.info(f"  Asking LLM for fix...")
+                    fix_cmd = self.llm.ask(
+                        prompt=f"pip failed to install '{pkg}'.\n\nstderr:\n{stderr}\n\nstdout:\n{stdout}\n\nWhat command fixes this?",
+                        context="Python pip package installation."
+                    )
+                    if fix_cmd:
+                        log.info(f"  LLM suggests: {fix_cmd}")
+                        run_command(fix_cmd, check=False)
+                        # Try installing again
+                        result = run_command(f"{venv_pip} install {pkg}", check=False)
+                        if result.returncode == 0:
+                            log.info(f"  ✓ pip package {pkg} installed.")
+                        else:
+                            self.failed_packages.append(pkg)
+                else:
+                    log.warning(f"  Skipping {pkg} (LLM not available)")
+                    self.failed_packages.append(pkg)
+            elif action == "skip":
+                pass  # Already handled in _handle_package_failure()
+            # "abort" is handled in _handle_package_failure()
 
     def backup_existing(self):
         """Backup existing dotfiles before overwriting."""
