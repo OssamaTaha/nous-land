@@ -470,7 +470,10 @@ class SmartInstaller:
 # ── Main ─────────────────────────────────────────
 def main():
     # ── Interactive API Key Prompt ────────────────
-    if not LLM_API_KEY:
+    # Check API key (module-level or .env)
+    llm_api_key = os.environ.get("OPENROUTER_API_KEY", "")
+
+    if not llm_api_key:
         print("\n" + "="*50)
         print("  NOUS LAND — LLM Self-Healing Setup")
         print("="*50)
@@ -481,7 +484,7 @@ def main():
         try:
             user_key = input("Enter OPENROUTER_API_KEY (or press Enter to skip): ").strip()
             if user_key:
-                LLM_API_KEY = user_key
+                llm_api_key = user_key
                 # Save to .env for future runs
                 env_file = REPO_DIR / ".env"
                 with open(env_file, "w") as f:
@@ -492,12 +495,16 @@ def main():
             print("\nSkipping LLM setup. Self-healing disabled.\n")
 
     installer = SmartInstaller()
-
-    log.info("=" * 50)
+ 
+    # Pass the key to the LLMClient
+    if llm_api_key:
+        installer.llm.api_key = llm_api_key
+        installer.llm.available = True
+ 
+    log.info("="* 50)
     log.info("NOUS LAND — Smart Installer Starting")
     log.info(f"LLM self-healing: {'ENABLED' if installer.llm.available else 'DISABLED (set OPENROUTER_API_KEY)'}")
-    log.info("=" * 50)
-
+    log.info("="* 50)
     # Step 1: Backup
     log.info("\n── Step 1: Backing up existing configs ──")
     installer.backup_existing()
