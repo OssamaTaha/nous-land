@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Hermes AI Agent
+Comment=Nous Land AI Desktop Assistant
+Exec=/usr/bin/python3 /home/%i/.config/nous-agent/daemon.py
+Icon=assistant
+Terminal=false
+Categories=System;
+X-GNOME-Autostart-enabled=true

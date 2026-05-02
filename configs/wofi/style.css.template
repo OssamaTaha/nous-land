@@ -1,0 +1,60 @@
+/* ───────────────────────────────────────────────────────
+   NOUS LAND — Wofi Launcher Style
+   Template rendered by theme-switcher.sh
+   ─────────────────────────────────────────────────────── */
+
+window {
+    margin: 0px;
+    border: 2px solid {{launcher_sel_bg}};
+    background-color: {{launcher_bg}};
+    border-radius: 8px;
+}
+
+#input {
+    margin: 8px 12px;
+    border: none;
+    background-color: {{bg_highlight}};
+    color: {{launcher_fg}};
+    font-family: {{font_ui}};
+    font-size: {{font_size}}pt;
+    border-radius: 4px;
+    padding: 6px 10px;
+}
+
+#inner-box {
+    margin: 4px 8px;
+    border: none;
+    background-color: transparent;
+}
+
+#outer-box {
+    margin: 4px;
+    border: none;
+    background-color: transparent;
+}
+
+#scroll {
+    margin: 0px;
+    border: none;
+}
+
+#entry {
+    margin: 0px;
+    border: none;
+    background-color: transparent;
+    color: {{launcher_fg}};
+    font-family: {{font_ui}};
+    font-size: {{font_size}}pt;
+    padding: 6px 10px;
+}
+
+#entry:selected {
+    background-color: {{launcher_sel_bg}};
+    color: {{launcher_sel_fg}};
+    border-radius: 4px;
+}
+
+#entry:hover {
+    background-color: {{bg_highlight}};
+    border-radius: 4px;
+}

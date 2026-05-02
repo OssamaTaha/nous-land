@@ -1,0 +1,68 @@
+# ─────────────────────────────────────────────────────────
+# NOUS LAND — Kitty Terminal Configuration
+# Template rendered by theme-switcher.sh
+# ─────────────────────────────────────────────────────────
+
+# ── Font Settings ────────────────────────────────
+font_family      {{font_mono}}
+bold_font        auto
+italic_font      auto
+bold_italic_font auto
+font_size        {{font_size}}
+
+# ── Window Layout ────────────────────────────────
+window_padding_width 8
+window_border_width {{border_width}}
+draw_minimal_border yes
+background_opacity 0.95
+
+# ── Colors (from theme) ─────────────────────────
+foreground            {{foreground}}
+background             {{background}}
+selection_foreground   {{selection_foreground}}
+selection_background   {{selection_background}}
+
+# Cursor
+cursor                 {{cursor}}
+cursor_text_color      {{cursor_text_color}}
+cursor_shape           block
+cursor_blink           off
+
+# URL
+url_color              {{url_color}}
+
+# Borders
+active_border_color    {{active_border_color}}
+inactive_border_color  {{inactive_border_color}}
+
+# Tab bar
+active_tab_background   {{active_tab_background}}
+active_tab_foreground   {{active_tab_foreground}}
+inactive_tab_background {{inactive_tab_background}}
+inactive_tab_foreground {{inactive_tab_foreground}}
+tab_bar_edge           none
+
+# ── 16-Color Palette ────────────────────────────
+color0    {{color0}}
+color1    {{color1}}
+color2    {{color2}}
+color3    {{color3}}
+color4    {{color4}}
+color5    {{color5}}
+color6    {{color6}}
+color7    {{color7}}
+color8    {{color8}}
+color9    {{color9}}
+color10   {{color10}}
+color11   {{color11}}
+color12   {{color12}}
+color13   {{color13}}
+color14   {{color14}}
+color15   {{color15}}
+
+# ── Other Settings ────────────────────────────────
+enable_audio_bell no
+visual_bell no
+focus_follows_mouse no
+copy_on_select no
+strip_trailing_spaces always

@@ -1,0 +1,8 @@
+[Unit]
+Description=Watch Nous Land theme changes
+
+[Path]
+PathModified=/tmp/nous-current-theme/theme.json
+
+[Install]
+WantedBy=default.target

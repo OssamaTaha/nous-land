@@ -1,0 +1,73 @@
+/* ───────────────────────────────────────────────────────
+   NOUS LAND — Waybar Style
+   Template rendered by theme-switcher.sh
+   ─────────────────────────────────────────────────────── */
+
+* {
+    border: none;
+    border-radius: 0;
+    font-family: {{font_ui}};
+    font-size: {{font_size_ui}}pt;
+    min-height: 0;
+}
+
+window#waybar {
+    background: {{panel_bg}};
+    color: {{panel_fg}};
+    border-bottom: 2px solid {{panel_border}};
+}
+
+tooltip {
+    background: {{panel_bg}};
+    border: 1px solid {{panel_border}};
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+#workspaces button {
+    padding: 0 5px;
+    color: {{panel_fg}};
+    border-radius: 4px;
+    margin: 2px 1px;
+}
+
+#workspaces button.active {
+    color: {{accent}};
+    background: {{bg_highlight}};
+}
+
+#workspaces button:hover {
+    background: {{bg_highlight}};
+}
+
+#window {
+    padding: 0 10px;
+    color: {{fg_alt}};
+}
+
+#clock,
+#clock#time,
+#battery,
+#pulseaudio,
+#network,
+#tray {
+    padding: 0 8px;
+    margin: 2px 1px;
+    color: {{panel_fg}};
+}
+
+#clock:hover,
+#battery:hover,
+#pulseaudio:hover,
+#network:hover {
+    background: {{bg_highlight}};
+    border-radius: 4px;
+}
+
+#tray {
+    padding: 0 4px;
+}
+
+#tray > widget {
+    padding: 0 2px;
+}

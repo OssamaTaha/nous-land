@@ -1,0 +1,16 @@
+[Unit]
+Description=Nous Land AI Agent Daemon
+After=graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/%i/.config/nous-agent/daemon.py
+Restart=on-failure
+RestartSec=5
+Environment=NOUS_THEME=
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

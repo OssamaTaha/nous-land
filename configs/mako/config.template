@@ -1,0 +1,30 @@
+# ─────────────────────────────────────────────────────────
+# NOUS LAND — Mako Notification Daemon Config
+# Template rendered by theme-switcher.sh
+# ─────────────────────────────────────────────────────────
+
+# Colors
+background-color={{notification_bg}}
+text-color={{notification_fg}}
+border-color={{notification_border}}
+progress-color=source {{accent}}
+
+# Font
+font={{font_ui}} {{font_size}}
+
+# Layout
+width=300
+height=200
+margin=10
+padding=10
+border-size=2
+border-radius=8
+per-src=0
+
+# Icons
+icons=1
+max-icon-size=32
+
+# Behave
+ignore-timeout=0
+default-timeout=5000

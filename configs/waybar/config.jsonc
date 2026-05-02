@@ -1,0 +1,107 @@
+{
+    "layer": "top",
+    "position": "top",
+    "mode": "dock",
+    "exclusive": true,
+    "passthrough": false,
+    "gtk-layer-shell": true,
+    "height": 0,
+    "modules-left": [
+        "clock",
+        "hyprland/workspaces",
+        "hyprland/mode"
+    ],
+    "modules-center": ["hyprland/window"],
+    "modules-right": [
+        "tray",
+        "network",
+        "pulseaudio",
+        "battery",
+        "clock#time"
+    ],
+
+    "hyprland/workspaces": {
+        "disable-scroll": true,
+        "all-outputs": true,
+        "on-click": "activate",
+        "on-scroll-up": "previous",
+        "on-scroll-down": "next",
+        "format": "{icon}",
+        "format-icons": {
+            "1": "󰀏",
+            "2": "󰀐",
+            "3": "󰀑",
+            "4": "󰀒",
+            "5": "󰀓",
+            "6": "󰀔",
+            "7": "󰀕",
+            "8": "󰀖",
+            "9": "󰀗",
+            "10": "󰀗",
+            "focused": "󰡶",
+            "urgent": "󰕧"
+        }
+    },
+
+    "hyprland/window": {
+        "format": "{}"
+    },
+
+    "hyprland/mode": {
+        "format": "<span style='italic'>{}</span>"
+    },
+
+    "tray": {
+        "icon-size": 13,
+        "spacing": 8
+    },
+
+    "network": {
+        "format-wifi": "󰖟 {essid} ({signalStrength}%)",
+        "format-ethernet": "{ipaddr}/{cidr}",
+        "format-alternative": "󰈺 {ifname} no ip",
+        "format-disconnected": "󰣠 Not Connected",
+        "tooltip-format": "{essid} via {gwaddr}"
+    },
+
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": "󰸈 Muted",
+        "on-click": "pamixer -t",
+        "on-scroll-up": "pamixer -i 5",
+        "on-scroll-down": "pamixer -d 5",
+        "scroll-step": 5,
+        "format-icons": {
+            "headphone": "󰋋",
+            "hands-free": "󰋎",
+            "headset": "󰋐",
+            "phone": "󰏫",
+            "portable": "󰌜",
+            "car": "󰌝",
+            "default": ["󰕿", "󰖀", "󰕾"]
+        }
+    },
+
+    "battery": {
+        "states": {
+            "good": 95,
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{icon} {capacity}%",
+        "format-charging": "󰂓 {capacity}%",
+        "format-plugged": "󰂔 {capacity}%",
+        "format-alt": "{time} {icon}",
+        "format-icons": ["󰂎", "󰂏", "󰂐", "󰂑", "󰂒", "󰂓"]
+    },
+
+    "clock": {
+        "format": "󰃳 {:%a, %b %e | 󰔟 %H:%M}",
+        "tooltip-format": "<big>{:%Y %B}</big>
+<tt><small>{calendar}</small></tt>"
+    },
+
+    "clock#time": {
+        "format": "󰔟 {:%H:%M}"
+    }
+}

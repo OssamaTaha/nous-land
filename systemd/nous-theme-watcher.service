@@ -1,0 +1,6 @@
+[Unit]
+Description=Reload theme on change
+
+[Service]
+Type=oneshot
+ExecStart=/home/%i/.local/bin/hot-reload.sh

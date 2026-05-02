@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Nous Land Theme Schema",
+  "type": "object",
+  "required": ["name", "author", "version", "colors", "surface", "typography", "wallpaper", "hyprland", "kitty"],
+  "properties": {
+    "name": { "type": "string", "description": "Theme name (lowercase, no spaces)" },
+    "author": { "type": "string" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "colors": {
+      "type": "object",
+      "required": ["bg", "bg_alt", "bg_highlight", "fg", "fg_alt", "fg_dim", "accent", "accent_alt", "urgent", "success", "warning", "border", "shadow"],
+      "properties": {
+        "bg": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "bg_alt": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "bg_highlight": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "fg": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "fg_alt": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "fg_dim": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "accent": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "accent_alt": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "urgent": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "success": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "warning": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "border": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "shadow": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+      }
+    },
+    "surface": {
+      "type": "object",
+      "required": ["panel_bg", "panel_fg", "panel_border", "launcher_bg", "launcher_fg", "launcher_sel_bg", "launcher_sel_fg", "notification_bg", "notification_fg", "notification_border"],
+      "properties": {
+        "panel_bg": { "type": "string" },
+        "panel_fg": { "type": "string" },
+        "panel_border": { "type": "string" },
+        "launcher_bg": { "type": "string" },
+        "launcher_fg": { "type": "string" },
+        "launcher_sel_bg": { "type": "string" },
+        "launcher_sel_fg": { "type": "string" },
+        "notification_bg": { "type": "string" },
+        "notification_fg": { "type": "string" },
+        "notification_border": { "type": "string" }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "required": ["font_mono", "font_ui", "font_size", "font_size_ui"],
+      "properties": {
+        "font_mono": { "type": "string" },
+        "font_ui": { "type": "string" },
+        "font_size": { "type": "number" },
+        "font_size_ui": { "type": "number" }
+      }
+    },
+    "wallpaper": {
+      "type": "object",
+      "required": ["path", "mode"],
+      "properties": {
+        "path": { "type": "string" },
+        "mode": { "type": "string", "enum": ["fill", "fit", "stretch", "center", "tile"] }
+      }
+    },
+    "hyprland": {
+      "type": "object",
+      "required": ["border_width", "active_border", "inactive_border", "gaps_inner", "gaps_outer", "rounding", "dim_strength", "shadow_range", "shadow_render_power"],
+      "properties": {
+        "border_width": { "type": "number" },
+        "active_border": { "type": "string" },
+        "inactive_border": { "type": "string" },
+        "gaps_inner": { "type": "number" },
+        "gaps_outer": { "type": "number" },
+        "rounding": { "type": "number" },
+        "dim_strength": { "type": "number", "minimum": 0, "maximum": 1 },
+        "shadow_range": { "type": "number" },
+        "shadow_render_power": { "type": "number" }
+      }
+    },
+    "kitty": {
+      "type": "object",
+      "required": ["foreground", "background", "color0", "color1", "color2", "color3", "color4", "color5", "color6", "color7", "color8", "color9", "color10", "color11", "color12", "color13", "color14", "color15"],
+      "properties": {
+        "foreground": { "type": "string" },
+        "background": { "type": "string" },
+        "selection_foreground": { "type": "string" },
+        "selection_background": { "type": "string" },
+        "cursor": { "type": "string" },
+        "cursor_text_color": { "type": "string" },
+        "url_color": { "type": "string" },
+        "active_border_color": { "type": "string" },
+        "inactive_border_color": { "type": "string" },
+        "active_tab_background": { "type": "string" },
+        "active_tab_foreground": { "type": "string" },
+        "inactive_tab_background": { "type": "string" },
+        "inactive_tab_foreground": { "type": "string" },
+        "color0": { "type": "string" },
+        "color1": { "type": "string" },
+        "color2": { "type": "string" },
+        "color3": { "type": "string" },
+        "color4": { "type": "string" },
+        "color5": { "type": "string" },
+        "color6": { "type": "string" },
+        "color7": { "type": "string" },
+        "color8": { "type": "string" },
+        "color9": { "type": "string" },
+        "color10": { "type": "string" },
+        "color11": { "type": "string" },
+        "color12": { "type": "string" },
+        "color13": { "type": "string" },
+        "color14": { "type": "string" },
+        "color15": { "type": "string" }
+      }
+    }
+  }
+}

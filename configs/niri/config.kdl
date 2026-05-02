@@ -1,0 +1,97 @@
+// ───────────────────────────────────────────────────────
+// NOUS LAND — Niri Configuration
+// Scrollable tiling WM with Hyprland-compatible keybinds
+// ───────────────────────────────────────────────────────
+
+// ── Input Configuration ────────────────────────────────
+input {
+    keyboard {
+        // Layout and options
+        xkb {
+            layout = "us"
+            options = "caps:escape"  // Make Caps Lock an Escape key
+        }
+    }
+    
+    mouse {
+        warp-at-edge = true
+    }
+    
+    touchpad {
+        two-finger-scroll = true
+        natural-scroll = true
+        tap = true
+        tap-button-map = "left-left-right"
+        disable-while-typing = true
+    }
+}
+
+// ── Output Configuration ───────────────────────────────
+output eDP-1 {
+    mode = "preferred"
+    scale = 1.0
+}
+
+// ── Layout ─────────────────────────────────────────────
+layout {
+    focus-ring {
+        width = 2
+        active-color = "d4a017"  // Will be replaced by theme
+        inactive-color = "2c2c2c"
+    }
+    
+    border {
+        enable = true
+        width = 2
+    }
+    
+    shadow {
+        enable = true
+        softness = 20
+    }
+    
+    gap {
+        left = 6
+        right = 6
+        top = 6
+        bottom = 6
+    }
+    
+    struts {
+        left = 0
+        right = 0
+        top = 0
+        bottom = 0
+    }
+}
+
+// ── Window Rules ───────────────────────────────────────
+window-rule {
+    match {
+        app-id = "waybar"
+        open-floating = true
+    }
+}
+
+// ── Animations ────────────────────────────────────────
+animations {
+    enable = true
+    slowdown = 1.0
+}
+
+// ── Preferences ───────────────────────────────────────
+preferences {
+    cursor-size = 24
+    focus-follows-mouse = true
+    hide-cursor-when-typing = true
+    
+    // Super key for app launching
+    super-key = "Super"
+    
+    // Screenshot
+    screenshot-path = "~/Pictures/Screenshots"
+}
+
+// ── Include keybinds ─────────────────────────────────
+// Keybinds are in a separate file for maintainability
+// Source: binds.kdl

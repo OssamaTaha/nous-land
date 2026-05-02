@@ -1,0 +1,54 @@
+/* ───────────────────────────────────────────────────────
+   NOUS LAND — Rofi Theme
+   Template rendered by theme-switcher.sh
+   ─────────────────────────────────────────────────────── */
+
+* {
+    font: "{{font_ui}}" {{font_size}};
+    background-color: {{launcher_bg}};
+    foreground-color: {{launcher_fg}};
+    border-color: {{launcher_sel_bg}};
+    text-color: {{launcher_fg}};
+}
+
+window {
+    background-color: {{launcher_bg}};
+    border: 2px solid {{launcher_sel_bg}};
+    border-radius: 8px;
+    padding: 4px;
+}
+
+#inputbar {
+    background-color: {{bg_highlight}};
+    border-radius: 4px;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+}
+
+#entry {
+    color: {{launcher_fg}};
+}
+
+#listview {
+    background-color: transparent;
+    border: none;
+}
+
+#element {
+    background-color: transparent;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+
+#element selected {
+    background-color: {{launcher_sel_bg}};
+    color: {{launcher_sel_fg}};
+    border-radius: 4px;
+}
+
+#mode-switcher {
+    background-color: {{bg_highlight}};
+    border-radius: 4px;
+    padding: 4px;
+}

@@ -1,0 +1,68 @@
+/* ───────────────────────────────────────────────────────
+   NOUS LAND — SwayNC Notification Style
+   Template rendered by theme-switcher.sh
+   ─────────────────────────────────────────────────────── */
+
+* {
+    font-family: {{font_ui}};
+    font-size: {{font_size_ui}}pt;
+}
+
+.notification-popups {
+    background: transparent;
+}
+
+.notification {
+    background: {{notification_bg}};
+    border: 2px solid {{notification_border}};
+    border-radius: 8px;
+    padding: 10px;
+    margin: 4px;
+    color: {{notification_fg}};
+}
+
+.notification .summary {
+    font-weight: bold;
+    color: {{accent}};
+    font-size: {{font_size}}pt;
+}
+
+.notification .body {
+    color: {{notification_fg}};
+}
+
+.notification .time {
+    color: {{fg_dim}};
+    font-size: 8pt;
+}
+
+.notification .close-btn {
+    background: transparent;
+    border: none;
+    color: {{urgent}};
+    font-size: 10pt;
+}
+
+.control-center {
+    background: {{notification_bg}};
+    border: 2px solid {{notification_border}};
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.control-center .title {
+    font-weight: bold;
+    color: {{accent}};
+    font-size: {{font_size}}pt;
+    padding-bottom: 8px;
+}
+
+.control-center .dnd-switch {
+    background: {{bg_highlight}};
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+.control-center .dnd-switch:checked {
+    background: {{accent}};
+}
