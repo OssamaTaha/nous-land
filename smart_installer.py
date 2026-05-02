@@ -14,12 +14,22 @@ from pathlib import Path
 from datetime import datetime
 
 # ── Configuration ────────────────────────────────
-REPO_DIR = Path(__file__).parent
-LOG_FILE = REPO_DIR / "install.log"
-THEMES_DIR = REPO_DIR / "themes"
-CONFIGS_DIR = REPO_DIR / "configs"
-SCRIPTS_DIR = REPO_DIR / "scripts"
+REPA_DIR = Path(__file__).parent
+LOG_FILE = REPA_DIR / "install.log"
+THEMES_DIR = REPA_DIR / "themes"
+CONFIGS_DIR = REPA_DIR / "configs"
+SCRIPTS_DIR = REPA_DIR / "scripts"
 BACKUP_DIR = Path.home() / ".config" / "nous-land-backup"
+# Load .env file if it exists (for saved API key)
+env_file = REPA_DIR / ".env"
+if env_file.exists():
+    with open(env_file) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                key, value = line.split('=', 1)
+                os.environ[key.strip()] = value.strip()
+    print(f"[env] Loaded API key from .env file")
 
 # LLM Configuration (user can override via env vars)
 LLM_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
@@ -107,14 +117,21 @@ class LLMClient:
         try:
             import requests
 
-            system_msg = (
-                "You are a Linux system administrator helping fix package installation "
-                "errors on Arch Linux (CachyOS). Given an error, respond with ONLY the "
-                "exact terminal command(s) needed to fix the issue. Use && to chain "
-                "commands if multiple steps are needed. Do not explain, just give commands. "
-                "Prefer pacman and yay solutions. Never suggest destructive operations "
-                "like rm -rf on system directories."
-            )
+           system_msg = (
+                "You are an expert Linux systems architect specializing in Arch Linux (CachyOS) package management. "
+                "Your job: given a pacman/yay error, respond with ONLY the exact terminal command(s) to fix it. "
+                "Rules: "
+                "1. Return ONLY executable bash commands, no explanations, no markdown. "
+                "2. Chain multiple commands with && if needed. "
+                "3. For 'invalid or corrupted package' or PGP errors: use 'sudo pacman-key --refresh-keys && sudo pacman -Sy archlinux-keyring --noconfirm'. "
+                "4. For 'conflicting files' errors: use 'sudo pacman -S --noconfirm --needed --overwrite \"*\" <package>'. "
+                "5. For 'target not found': suggest 'yay -S <package>' or check AUR. "
+                "6. For 'could not satisfy dependencies': use 'sudo pacman -Syu --noconfirm' first. "
+                "7. For database lock issues: use 'sudo rm /var/lib/pacman/db.lck'. "
+                "8. Always prefer pacman/yay solutions. "
+                "9. Never suggest destructive operations like 'rm -rf /' or 'mkfs'. "
+                "10. Prepend 'sudo' to commands that need root privileges."
+           )
 
             messages = [{"role": "system", "content": system_msg}]
             if context:
@@ -181,9 +198,9 @@ class SmartInstaller:
         """Install packages via pacman with self-healing."""
         log.info(f"Installing {len(packages)} pacman packages...")
 
-        # Batch install first attempt
-        pkg_str = " ".join(packages)
-        result = run_command(f"pacman -S --noconfirm --needed {pkg_str}", check=False)
+       # Batch install first attempt
+       pkg_str = " ".join(packages)
+        result = run_command(f"pacman -S --noconfirm --needed {pkg_str}", check=False, sudo=True)
 
         if result.returncode == 0:
             self.installed_packages.extend(packages)
@@ -199,7 +216,7 @@ class SmartInstaller:
         """Install a single pacman package with retry and LLM healing."""
         for attempt in range(1, self.MAX_RETRIES + 1):
             log.info(f"  Installing {pkg} (attempt {attempt}/{self.MAX_RETRIES})...")
-            result = run_command(f"pacman -S --noconfirm --needed {pkg}", check=False)
+            result = run_command(f"pacman -S --noconfirm --needed {pkg}", check=False, sudo=True)
 
             if result.returncode == 0:
                 self.installed_packages.append(pkg)
@@ -452,6 +469,28 @@ class SmartInstaller:
 
 # ── Main ─────────────────────────────────────────
 def main():
+    # ── Interactive API Key Prompt ────────────────
+    if not LLM_API_KEY:
+        print("\n" + "="*50)
+        print("  NOUS LAND — LLM Self-Healing Setup")
+        print("="*50)
+        print("\nNo OPENROUTER_API_KEY found. LLM self-healing is DISABLED.")
+        print("To enable smart error recovery, enter your OpenRouter API key below.")
+        print("Get one at: https://openrouter.ai/keys\n")
+        
+        try:
+            user_key = input("Enter OPENROUTER_API_KEY (or press Enter to skip): ").strip()
+            if user_key:
+                LLM_API_KEY = user_key
+                # Save to .env for future runs
+                env_file = REPO_DIR / ".env"
+                with open(env_file, "w") as f:
+                    f.write(f"OPENROUTER_API_KEY={user_key}\n")
+                os.environ["OPENROUTER_API_KEY"] = user_key
+                print("✓ API key saved to .env file.\n")
+        except (EOFError, KeyboardInterrupt):
+            print("\nSkipping LLM setup. Self-healing disabled.\n")
+
     installer = SmartInstaller()
 
     log.info("=" * 50)
