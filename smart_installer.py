@@ -71,7 +71,6 @@ PACMAN_PACKAGES = [
     "pamixer",
     "playerctl",
     "network-manager-applet",
-    "blueberry",
     "ttf-jetbrains-mono-nerd",
     "ttf-font-awesome",
     "noto-fonts-emoji",
@@ -470,6 +469,15 @@ class SmartInstaller:
 # ── Main ─────────────────────────────────────────
 def main():
     # ── Interactive API Key Prompt ────────────────
+    # Temporarily disable logging to stdout so input() prompt is visible
+    root_logger = logging.getLogger()
+    stdout_handler = None
+    for h in root_logger.handlers:
+        if isinstance(h, logging.StreamHandler) and h.stream == sys.stdout:
+            stdout_handler = h
+            root_logger.removeHandler(h)
+            break
+
     # Check API key (module-level or .env)
     llm_api_key = os.environ.get("OPENROUTER_API_KEY", "")
 
@@ -480,7 +488,7 @@ def main():
         print("\nNo OPENROUTER_API_KEY found. LLM self-healing is DISABLED.")
         print("To enable smart error recovery, enter your OpenRouter API key below.")
         print("Get one at: https://openrouter.ai/keys\n")
-        
+
         try:
             user_key = input("Enter OPENROUTER_API_KEY (or press Enter to skip): ").strip()
             if user_key:
@@ -494,13 +502,17 @@ def main():
         except (EOFError, KeyboardInterrupt):
             print("\nSkipping LLM setup. Self-healing disabled.\n")
 
+    # Restore logging to stdout
+    if stdout_handler:
+        root_logger.addHandler(stdout_handler)
+
     installer = SmartInstaller()
- 
-    # Pass the key to the LLMClient
+    
+    # Pass the key to the LLM client
     if llm_api_key:
         installer.llm.api_key = llm_api_key
         installer.llm.available = True
- 
+
     log.info("="* 50)
     log.info("NOUS LAND — Smart Installer Starting")
     log.info(f"LLM self-healing: {'ENABLED' if installer.llm.available else 'DISABLED (set OPENROUTER_API_KEY)'}")

@@ -118,26 +118,42 @@ else
     pip install -q requests textual
 fi
 
-# ── Hand Off to Smart Installer ─────────────────────
+# ── Hand Off to Smart Installer ────────────────────
 log "Starting LLM-powered smart installer..."
 echo ""
 
-if [ -f "smart_installer.py" ]; then
-    python3 smart_installer.py "$@"
-    EXIT_CODE=$?
+# Check if stdin is a terminal (interactive mode)
+if [ -t 0 ]; then
+    # Running interactively - OK
+    if [ -f "smart_installer.py" ]; then
+        python3 smart_installer.py "$@"
+        EXIT_CODE=$?
+    else
+        warn "smart_installer.py not found. Skipping LLM installer."
+        warn "Deploying configs manually..."
+        # Basic fallback: just copy configs
+        CONFIGS_DIR="$NOUS_DIR/configs"
+        for dir in hyprland niri kitty waybar wofi swaync rofi mako; do
+            if [ -d "$CONFIGS_DIR/$dir" ]; then
+                cp -r "$CONFIGS_DIR/$dir" "$HOME/.config/"
+                log "Deployed $dir config"
+            fi
+        done
+        EXIT_CODE=0
+    fi
 else
-    warn "smart_installer.py not found. Skipping LLM installer."
-    warn "Deploying configs manually..."
-    
-    # Basic fallback: just copy configs
-    CONFIGS_DIR="$NOUS_DIR/configs"
-    for dir in hyprland niri kitty waybar wofi swaync rofi mako; do
-        if [ -d "$CONFIGS_DIR/$dir" ]; then
-            cp -r "$CONFIGS_DIR/$dir" "$HOME/.config/"
-            log "Deployed $dir config"
-        fi
-    done
-    EXIT_CODE=0
+    # Piped mode (curl | bash) - re-execute interactively
+    warn "Piped mode detected. Re-executing interactively for API key prompt..."
+    TMP_SCRIPT=$(mktemp /tmp/nous-install-XXXXXX.sh)
+    # Download the install script
+    curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh -o "$TMP_SCRIPT" 2>/dev/null
+    if [ -f "$TMP_SCRIPT" ]; then
+        chmod +x "$TMP_SCRIPT"
+        exec bash "$TMP_SCRIPT"
+    else
+        err "Failed to download install script for interactive re-execution."
+        EXIT_CODE=1
+    fi
 fi
 
 # ── Post-Installation ────────────────────────────────
