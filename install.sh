@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────
-# NOUS LAND — Smart Installer Entry Point
+# NOUS LAND — Smart Installer Bootstrapper
 # Usage: curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh | bash
 # Better: curl -o /tmp/nous-install.sh https://... && bash /tmp/nous-install.sh
 # ──────────────────────────────────────────────────────
 
-# Note: we do NOT use 'set -u' because we check unbound vars with -n/-z
+# Note: NO 'set -u' - we check vars with -z/-n to avoid unbound errors
 set -eo pipefail
 
 # ── Colors ───────────────────────────────────────────
@@ -30,8 +30,8 @@ echo -e "${BOLD}║    Hyprland + Niri + AI Agent           ║${NC}"
 echo -e "${BOLD}╚════════════════════════════════════════╝${NC}"
 echo ""
 
-# ── PIPE DETECTION (MUST be first thing after banner) ──
-# Check if stdin is a pipe/redirect (curl | bash scenario)
+# ── PIPE DETECTION (FIRST THING) ───────────────────
+# If stdin is a pipe (curl | bash), we can't do interactive prompts
 if [ ! -t 0 ]; then
     echo ""
     echo -e "${BOLD}╔════════════════════════════════════════╗${NC}"
@@ -40,7 +40,7 @@ if [ ! -t 0 ]; then
     echo ""
     err "Running via 'curl | bash' does NOT support interactive prompts."
     echo ""
-    info "The installer needs to ask you for an API key (for the AI features)."
+    info "The installer needs to ask you for an API key (for AI features)."
     info "Please run these TWO commands instead:"
     echo ""
     echo -e "  ${CYN}curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh -o /tmp/nous-install.sh${NC}"
@@ -75,36 +75,65 @@ if [ ! -f /etc/arch-release ]; then
     fi
 fi
 
-# Check for git
+# ── Step 1: Check for Git ───────────────────────────
+info "Checking for git..."
 if ! command -v git &>/dev/null; then
     log "Installing git..."
     sudo pacman -S --noconfirm git
+    ok "Git installed."
+else
+    ok "Git is available."
 fi
 
-# ── Clone or Update Repository ────────────────────────
-NOUS_DIR="$HOME/.config/nous-land"
+# ── Step 2: Clone or Update Repository ───────────────
+NOUS_DIR="$HOME/.nous-land"
 REPO_URL="https://github.com/OssamaTaha/nous-land.git"
+
+info "Setting up Nous Land repository at: $NOUS_DIR"
 
 if [ -d "$NOUS_DIR/.git" ]; then
     log "Existing installation found. Pulling latest changes..."
-    git -C "$NOUS_DIR" pull --rebase 2>/dev/null || true
+    if git -C "$NOUS_DIR" pull --rebase 2>&1; then
+        ok "Repository updated successfully."
+    else
+        warn "Git pull failed. Trying fresh clone..."
+        rm -rf "$NOUS_DIR"
+        if git clone "$REPO_URL" "$NOUS_DIR" 2>&1; then
+            ok "Repository cloned successfully."
+        else
+            err "Failed to clone repository. Check your internet connection."
+            exit 1
+        fi
+    fi
 else
     log "Cloning Nous Land repository..."
-    if git clone "$REPO_URL" "$NOUS_DIR" 2>/dev/null; then
+    if git clone "$REPO_URL" "$NOUS_DIR" 2>&1; then
         ok "Repository cloned successfully."
     else
-        err "GitHub clone failed. Check your internet connection."
+        err "Failed to clone repository. Check your internet connection."
         exit 1
     fi
 fi
 
-# Ensure we're in the right directory
-cd "$NOUS_DIR" || {
+# ── Step 3: Change Directory ─────────────────────────
+info "Entering repository directory..."
+if cd "$NOUS_DIR" 2>/dev/null; then
+    ok "Now working in: $(pwd)"
+else
     err "Failed to enter $NOUS_DIR"
     exit 1
-}
+fi
 
-# ── Bootstrap Python Environment ─────────────────────
+# Verify critical files exist
+if [ ! -f "smart_installer.py" ]; then
+    err "smart_installer.py not found in repository!"
+    err "Repository structure may be corrupted."
+    ls -la "$NOUS_DIR"
+    exit 1
+fi
+ok "Repository files verified."
+
+# ── Step 4: Bootstrap Python Environment ────────────
 log "Bootstrapping Python environment..."
 
 # Find or install Python
@@ -121,46 +150,51 @@ if [ -z "$PYTHON" ]; then
     sudo pacman -S --noconfirm python
     PYTHON=$(command -v python3)
 fi
+ok "Using Python: $PYTHON"
 
 # Create venv if needed
 VENV_DIR="$NOUS_DIR/.venv"
 if [ ! -d "$VENV_DIR" ]; then
     log "Creating Python virtual environment..."
     $PYTHON -m venv "$VENV_DIR"
+    ok "Virtual environment created."
+else
+    ok "Virtual environment already exists."
 fi
 
 # Activate venv
+log "Activating virtual environment..."
 # shellcheck source=/dev/null
 source "$VENV_DIR/bin/activate"
+ok "Virtual environment activated."
 
 # Install Python dependencies
 log "Installing Python dependencies..."
 pip install -q --upgrade pip
 if [ -f "requirements.txt" ]; then
     pip install -q -r requirements.txt
+    ok "Dependencies installed from requirements.txt"
 else
     # Install defaults if requirements.txt missing
     pip install -q requests textual
+    warn "requirements.txt not found. Installed default dependencies."
 fi
 
-# ── Hand Off to Smart Installer ─────────────────────
+# ── Step 5: Execute Smart Installer ─────────────────
+echo ""
 log "Starting LLM-powered smart installer..."
 echo ""
 
+# Use the venv's python to ensure correct environment
+VENV_PYTHON="$VENV_DIR/bin/python"
+
 if [ -f "smart_installer.py" ]; then
-    python3 smart_installer.py "$@"
+    $VENV_PYTHON smart_installer.py "$@"
     EXIT_CODE=$?
 else
-    warn "smart_installer.py not found. Skipping LLM installer."
-    warn "Deploying configs manually..."
-    CONFIGS_DIR="$NOUS_DIR/configs"
-    for dir in hyprland niri kitty waybar wofi swaync rofi mako; do
-        if [ -d "$CONFIGS_DIR/$dir" ]; then
-            cp -r "$CONFIGS_DIR/$dir" "$HOME/.config/" 2>/dev/null || true
-            log "Deployed $dir config"
-        fi
-    done
-    EXIT_CODE=0
+    err "smart_installer.py not found even after clone!"
+    err "This should not happen. Please report this bug."
+    EXIT_CODE=1
 fi
 
 # ── Post-Installation ────────────────────────────────
@@ -183,5 +217,5 @@ else
 fi
 
 # Cleanup
-rm -rf /tmp/nous-install.sh 2>/dev/null || true
+rm -f /tmp/nous-install.sh 2>/dev/null || true
 exit $EXIT_CODE
