@@ -117,7 +117,7 @@ class LLMClient:
         try:
             import requests
 
-           system_msg = (
+            system_msg = (
                 "You are an expert Linux systems architect specializing in Arch Linux (CachyOS) package management. "
                 "Your job: given a pacman/yay error, respond with ONLY the exact terminal command(s) to fix it. "
                 "Rules: "
@@ -198,8 +198,8 @@ class SmartInstaller:
         """Install packages via pacman with self-healing."""
         log.info(f"Installing {len(packages)} pacman packages...")
 
-       # Batch install first attempt
-       pkg_str = " ".join(packages)
+        # Batch install first attempt
+        pkg_str = " ".join(packages)
         result = run_command(f"pacman -S --noconfirm --needed {pkg_str}", check=False, sudo=True)
 
         if result.returncode == 0:
