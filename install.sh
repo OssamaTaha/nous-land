@@ -157,20 +157,22 @@ elif [ -t 0 ]; then
         EXIT_CODE=0
     fi
 else
-    # Piped mode (curl | bash) - spawn pseudo-terminal for interactive input
-    warn "Piped mode detected. Spawning interactive shell..."
-    TMP_DIR=$(mktemp -d /tmp/nous-install-XXXXXX)
-    # Download the install script
-    curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh -o "$TMP_DIR/install.sh" 2>/dev/null
-    if [ -f "$TMP_DIR/install.sh" ]; then
-        chmod +x "$TMP_DIR/install.sh"
-        # Use script -q -c "command" /dev/null
-        # -q = quiet, -c = command to run, /dev/null = discard typescript
-        exec script -q -c "bash -i $TMP_DIR/install.sh" /dev/null
-    else
-        err "Failed to download install script for interactive re-execution."
-        EXIT_CODE=1
-    fi
+    # Piped mode (curl | bash) - can't do interactive prompts
+    # Best approach: tell user to download + run manually
+    echo ""
+    echo -e "${BOLD}╔══════════════════════════════════╗${NC}"
+    echo -e "${BOLD}║  PIPED MODE DETECTED              ║${NC}"
+    echo -e "${BOLD}╚══════════════════════════════════╝${NC}"
+    echo ""
+    err "Running via 'curl | bash' does NOT support interactive prompts."
+    info "Please run these TWO commands instead:"
+    echo ""
+    echo -e "  ${CYN}curl -fsSL https://raw.githubusercontent.com/OssamaTaha/nous-land/main/install.sh -o /tmp/nous-install.sh${NC}"
+    echo -e "  ${CYN}bash /tmp/nous-install.sh${NC}"
+    echo ""
+    info "This gives the script a real terminal for the API key prompt."
+    echo ""
+    exit 1
 fi
 
 # ── Post-Installation ────────────────────────────────
